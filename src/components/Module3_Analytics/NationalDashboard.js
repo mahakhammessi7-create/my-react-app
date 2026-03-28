@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Cell,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer,
+  Cell, ReferenceLine,
 } from 'recharts';
 import API from '../../services/api';
 
@@ -10,328 +10,396 @@ import API from '../../services/api';
    STYLES
 ══════════════════════════════════════════════ */
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
 
-  @keyframes nd-up   { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes nd-spin { to{transform:rotate(360deg)} }
-  @keyframes nd-glow { 0%,100%{opacity:.25} 50%{opacity:.7} }
-  @keyframes nd-rotateSlow { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-  @keyframes nd-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+  @keyframes nd-fadeUp   { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes nd-spin     { to{transform:rotate(360deg)} }
+  @keyframes nd-pulse    { 0%,100%{opacity:.4;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
+  @keyframes nd-shimmer  { from{background-position:200% center} to{background-position:-200% center} }
+  @keyframes nd-scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(400%)} }
 
-  .nd-root { font-family:'DM Sans',sans-serif; }
+  .nd-root { font-family:'Space Grotesk',sans-serif; }
   .nd-root * { box-sizing:border-box; margin:0; padding:0; }
-  .nd-anim { animation:nd-up .5s ease both; }
-  .nd-anim:nth-child(1){animation-delay:.04s}
-  .nd-anim:nth-child(2){animation-delay:.09s}
-  .nd-anim:nth-child(3){animation-delay:.14s}
-  .nd-anim:nth-child(4){animation-delay:.19s}
-  .nd-anim:nth-child(5){animation-delay:.24s}
-  .nd-anim:nth-child(6){animation-delay:.29s}
 
-  .nd-stat { transition:transform .25s, box-shadow .25s; }
-  .nd-stat:hover { transform:translateY(-5px); box-shadow:0 20px 48px rgba(0,0,0,.45) !important; }
-
-  .nd-sector-row { transition:background .2s, transform .2s; }
-  .nd-sector-row:hover { background:rgba(99,210,190,.04) !important; transform:translateX(3px); }
-
-  .nd-retry {
-    display:inline-flex; align-items:center; gap:8px;
-    background:linear-gradient(135deg,#63d2be,#2eb8a0);
-    color:#071520; border:none; padding:11px 24px; border-radius:12px;
-    font-size:13px; font-family:'DM Sans',sans-serif; font-weight:700;
-    cursor:pointer; transition:filter .2s, transform .15s;
-    margin-top:14px;
+  .nd-card {
+    background:rgba(255,255,255,.025);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:20px;
+    transition:border-color .3s, box-shadow .3s;
   }
-  .nd-retry:hover { filter:brightness(1.1); transform:translateY(-2px); }
+  .nd-card:hover { border-color:rgba(99,210,190,.15); box-shadow:0 0 40px rgba(99,210,190,.05); }
+
+  .nd-kpi {
+    cursor:default;
+    transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s;
+  }
+  .nd-kpi:hover { transform:translateY(-6px) scale(1.02); }
+
+  .nd-anim-1 { animation:nd-fadeUp .5s ease both .05s }
+  .nd-anim-2 { animation:nd-fadeUp .5s ease both .12s }
+  .nd-anim-3 { animation:nd-fadeUp .5s ease both .19s }
+  .nd-anim-4 { animation:nd-fadeUp .5s ease both .26s }
+  .nd-anim-5 { animation:nd-fadeUp .5s ease both .33s }
+  .nd-anim-6 { animation:nd-fadeUp .5s ease both .40s }
+
+  .nd-bar-fill {
+    height:100%; border-radius:99px;
+    transition:width 1.4s cubic-bezier(.22,1,.36,1);
+  }
 `;
 
-function injectNdStyles() {
-  if (document.getElementById('nd-styles')) return;
+function injectStyles() {
+  if (document.getElementById('nd-styles-v2')) return;
   const el = document.createElement('style');
-  el.id = 'nd-styles'; el.textContent = CSS;
+  el.id = 'nd-styles-v2'; el.textContent = CSS;
   document.head.appendChild(el);
 }
 
 /* ══════════════════════════════════════════════
    THEME
 ══════════════════════════════════════════════ */
-const BG     = '#07111e';
-const CARD   = 'rgba(255,255,255,.028)';
-const BORDER = 'rgba(255,255,255,.07)';
-const TEAL   = '#63d2be';
+const BG     = '#070f1a';
+const TEAL   = '#5eead4';
 const GREEN  = '#4ade80';
 const AMBER  = '#fbbf24';
 const RED    = '#f87171';
-const PURPLE = '#818cf8';
+const INDIGO = '#818cf8';
 const BLUE   = '#38bdf8';
 
+const scoreColor = s => s >= 75 ? GREEN : s >= 55 ? AMBER : RED;
+
 /* ══════════════════════════════════════════════
-   MOCK DATA — affiché immédiatement, remplacé par l'API si dispo
+   CUSTOM TOOLTIPS
 ══════════════════════════════════════════════ */
-const MOCK = {
-  global: {
-    total_reports:   24,
-    avg_score:       '73.4',
-    pending_count:   5,
-    with_rssi:       18,
-    validated_count: 16,
-  },
-  sectors: [
-    { sector:'Finance',        total:8, avg_score:'82' },
-    { sector:'Santé',          total:5, avg_score:'67' },
-    { sector:'Administration', total:4, avg_score:'74' },
-    { sector:'Énergie',        total:3, avg_score:'58' },
-    { sector:'Industrie',      total:2, avg_score:'71' },
-    { sector:'Télécoms',       total:2, avg_score:'79' },
-  ],
-  maturity: [
-    { axe:'Gouvernance',       valeur:72 },
-    { axe:'Risques & Actifs',  valeur:54 },
-    { axe:'Continuité',        valeur:67 },
-    { axe:'Contrôle Accès',    valeur:88 },
-    { axe:'Protection',        valeur:56 },
-    { axe:'Sauvegardes',       valeur:59 },
-    { axe:'Sécurité Physique', valeur:85 },
-    { axe:'Incidents',         valeur:90 },
-  ],
+const EvoTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  const score = payload[0]?.value;
+  const count = payload[1]?.value;
+  const c = scoreColor(score);
+  return (
+    <div style={{ background:'#0d1f35', border:`1px solid ${c}30`, borderRadius:12, padding:'12px 16px', fontSize:12 }}>
+      <div style={{ color:'#64748b', marginBottom:6, fontSize:11, fontFamily:"'JetBrains Mono',monospace" }}>Semaine du {label}</div>
+      <div style={{ color:c, fontWeight:700, fontSize:20, fontFamily:"'JetBrains Mono',monospace", lineHeight:1 }}>{score}%</div>
+      <div style={{ color:'#475569', fontSize:11, marginTop:4 }}>{count} rapport{count > 1 ? 's' : ''}</div>
+    </div>
+  );
 };
-
-/* ══════════════════════════════════════════════
-   HELPERS
-══════════════════════════════════════════════ */
-const scoreColor = (s) => s >= 75 ? GREEN : s >= 55 ? AMBER : RED;
-
-function SectionHeader({ icon, title, iconBg = TEAL }) {
-  return (
-    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'16px 22px', borderBottom:`1px solid ${BORDER}` }}>
-      <div style={{ width:34, height:34, borderRadius:10, background:`${iconBg}18`, border:`1px solid ${iconBg}28`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 }}>{icon}</div>
-      <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:13, fontWeight:700, color:'#b0cce0', letterSpacing:'.4px', textTransform:'uppercase' }}>{title}</h2>
-    </div>
-  );
-}
-
-function MiniBar({ value, color }) {
-  const [w, setW] = useState(0);
-  useEffect(() => { const t = setTimeout(() => setW(value), 500); return () => clearTimeout(t); }, [value]);
-  return (
-    <div style={{ flex:1, height:6, background:'rgba(255,255,255,.06)', borderRadius:99, overflow:'hidden' }}>
-      <div style={{ width:`${w}%`, height:'100%', background:`linear-gradient(90deg,${color}55,${color})`, borderRadius:99, transition:'width 1.2s cubic-bezier(.22,1,.36,1)', boxShadow:`0 0 8px ${color}44` }} />
-    </div>
-  );
-}
 
 const BarTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
-  const score = payload[0].value;
+  const score = parseFloat(payload[0]?.value);
   const c = scoreColor(score);
   return (
-    <div style={{ background:'#0c1e34', border:`1px solid rgba(99,210,190,.2)`, borderRadius:10, padding:'10px 14px', fontSize:12, color:'#d4e8ff' }}>
-      <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, color:TEAL, marginBottom:4 }}>{label}</div>
-      <div style={{ fontWeight:800, fontSize:18, color:c, fontFamily:"'Syne',sans-serif" }}>{score}%</div>
-    </div>
-  );
-};
-
-const RadarTooltip = ({ active, payload }) => {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  const c = scoreColor(d.valeur);
-  return (
-    <div style={{ background:'#0c1e34', border:`1px solid ${c}44`, borderRadius:10, padding:'10px 14px', fontSize:12, color:'#d4e8ff' }}>
-      <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, color:c, marginBottom:3 }}>{d.axe}</div>
-      <div style={{ fontWeight:800, fontSize:18, color:c, fontFamily:"'Syne',sans-serif" }}>{d.valeur}%</div>
+    <div style={{ background:'#0d1f35', border:`1px solid ${c}30`, borderRadius:12, padding:'12px 16px', fontSize:12 }}>
+      <div style={{ color:'#64748b', marginBottom:4, fontSize:11 }}>{label}</div>
+      <div style={{ color:c, fontWeight:700, fontSize:18, fontFamily:"'JetBrains Mono',monospace" }}>{score}%</div>
     </div>
   );
 };
 
 /* ══════════════════════════════════════════════
-   MAIN COMPONENT
+   ANIMATED COUNT
+══════════════════════════════════════════════ */
+function AnimCount({ target, suffix = '', duration = 1200 }) {
+  const [val, setVal] = useState(0);
+  const start = useRef(null);
+  useEffect(() => {
+    start.current = null;
+    const step = (ts) => {
+      if (!start.current) start.current = ts;
+      const p = Math.min((ts - start.current) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 4);
+      setVal(Math.round(ease * target));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [target]);
+  return <>{val}{suffix}</>;
+}
+
+/* ══════════════════════════════════════════════
+   ANIMATED BAR
+══════════════════════════════════════════════ */
+function AnimBar({ value, color, delay = 0 }) {
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setW(value), 400 + delay);
+    return () => clearTimeout(t);
+  }, [value]);
+  return (
+    <div style={{ flex:1, height:5, background:'rgba(255,255,255,.05)', borderRadius:99, overflow:'hidden' }}>
+      <div className="nd-bar-fill" style={{ width:`${w}%`, background:`linear-gradient(90deg,${color}60,${color})`, boxShadow:`0 0 10px ${color}40` }} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   SECTION LABEL
+══════════════════════════════════════════════ */
+function Label({ children, color = TEAL }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:18 }}>
+      <div style={{ width:3, height:16, background:color, borderRadius:99, boxShadow:`0 0 8px ${color}` }} />
+      <span style={{ fontSize:11, fontWeight:600, color:'#475569', letterSpacing:'.8px', textTransform:'uppercase' }}>{children}</span>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   MAIN
 ══════════════════════════════════════════════ */
 export default function NationalDashboard() {
-  // ✅ FIX : initialiser avec MOCK directement — page jamais vide
-  const [stats,   setStats]   = useState(MOCK);
-  const [apiOk,   setApiOk]   = useState(null);  // null=loading, true=ok, false=error
+  const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
+  const [apiOk,   setApiOk]   = useState(null);
 
   useEffect(() => {
-    injectNdStyles();
-    loadStats();
-    return () => document.getElementById('nd-styles')?.remove();
+    injectStyles();
+    load();
+    return () => document.getElementById('nd-styles-v2')?.remove();
   }, []);
 
-  const loadStats = async () => {
+  const load = async () => {
     setLoading(true);
     try {
       const res = await API.get('/stats/national');
-      if (res.data && res.data.global) {
-        setStats(prev => ({ ...MOCK, ...res.data }));
-        setApiOk(true);
-      } else {
-        // Réponse vide → garder mock
-        setApiOk(false);
-      }
-    } catch {
-      // API indisponible → garder mock, afficher banner
-      setApiOk(false);
-    } finally {
-      setLoading(false);
-    }
+      if (res.data?.global) { setStats(res.data); setApiOk(true); }
+      else { setApiOk(false); setStats(null); }
+    } catch { setApiOk(false); setStats(null); }
+    finally { setLoading(false); }
   };
 
-  const g       = stats.global || {};
-  const sectors = stats.sectors || [];
-  const maturity = stats.maturity || MOCK.maturity;
+  /* ── Loading ── */
+  if (loading) return (
+    <div className="nd-root" style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16 }}>
+      <div style={{ width:44, height:44, border:`2px solid rgba(94,234,212,.1)`, borderTop:`2px solid ${TEAL}`, borderRadius:'50%', animation:'nd-spin 1s linear infinite' }} />
+      <p style={{ color:'#334155', fontSize:13, fontFamily:"'JetBrains Mono',monospace" }}>Chargement des données...</p>
+    </div>
+  );
+
+  /* ── No data ── */
+  if (!stats) return (
+    <div className="nd-root" style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh' }}>
+      <div style={{ textAlign:'center', maxWidth:420 }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>📊</div>
+        <h2 style={{ fontWeight:700, color:'#e2e8f0', marginBottom:8, fontSize:18 }}>Aucune donnée disponible</h2>
+        <p style={{ color:'#334155', fontSize:13, lineHeight:1.8, marginBottom:24 }}>Le dashboard se remplit lorsque des entreprises soumettent leurs rapports d'audit.</p>
+        <button onClick={load} style={{ padding:'10px 24px', background:`${TEAL}18`, color:TEAL, border:`1px solid ${TEAL}28`, borderRadius:12, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:"'Space Grotesk',sans-serif" }}>
+          🔄 Actualiser
+        </button>
+      </div>
+    </div>
+  );
+
+  const g         = stats.global    || {};
+  const sectors   = stats.sectors   || [];
+  const evolution = stats.evolution || [];
+
   const total   = parseInt(g.total_reports)   || 0;
   const avg     = parseFloat(g.avg_score)     || 0;
   const pending = parseInt(g.pending_count)   || 0;
   const rssi    = parseInt(g.with_rssi)       || 0;
   const valid   = parseInt(g.validated_count) || 0;
+  const avgColor = scoreColor(avg);
 
-  /* ── RENDER ── */
+  /* Trend: compare last two evolution points */
+  const trend = evolution.length >= 2
+    ? parseFloat(evolution[evolution.length-1].avg_score) - parseFloat(evolution[evolution.length-2].avg_score)
+    : null;
+
   return (
-    <div className="nd-root" style={{ color:'#e2f0ff' }}>
+    <div className="nd-root" style={{ color:'#e2e8f0', paddingBottom:32 }}>
 
-      {/* ── PAGE HEADER ── */}
-      <div className="nd-anim" style={{ background:'linear-gradient(135deg,#0c1f3a,#0a2540)', borderRadius:20, padding:'22px 28px', marginBottom:20, display:'flex', alignItems:'center', gap:18, position:'relative', overflow:'hidden', border:'1px solid rgba(99,210,190,.12)', boxShadow:'0 8px 32px rgba(0,0,0,.4)' }}>
-        {[180,120].map((s,i) => (
-          <div key={i} style={{ position:'absolute', width:s, height:s, borderRadius:'50%', border:'1px solid rgba(99,210,190,.08)', right:-s/4, top:'50%', transform:'translateY(-50%)', animation:`nd-rotateSlow ${20+i*6}s linear infinite` }} />
-        ))}
-        <div style={{ width:50, height:50, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, boxShadow:'0 0 0 2px rgba(99,210,190,.25)', flexShrink:0, position:'relative' }}>📊</div>
-        <div style={{ flex:1, position:'relative' }}>
-          <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:19, fontWeight:800, color:'#e4f2ff', marginBottom:4 }}>Tableau de bord national</h1>
-          <p style={{ fontSize:12, color:'#3d607a' }}>Vue agrégée de tous les audits de sécurité · ANCS 2026</p>
+      {/* ── HEADER ── */}
+      <div className="nd-anim-1" style={{ marginBottom:28, display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+        <div>
+          <div style={{ fontSize:11, color:'#334155', letterSpacing:'.8px', textTransform:'uppercase', fontFamily:"'JetBrains Mono',monospace", marginBottom:6 }}>ANCS · Audit SSI 2026</div>
+          <h1 style={{ fontSize:26, fontWeight:700, color:'#f1f5f9', lineHeight:1 }}>Tableau de bord national</h1>
         </div>
-        {/* API status indicator */}
-        <div style={{ display:'flex', alignItems:'center', gap:7, fontSize:11, color: apiOk === true ? GREEN : apiOk === false ? AMBER : '#3d607a', position:'relative' }}>
-          {loading
-            ? <span style={{ width:12, height:12, border:`2px solid rgba(99,210,190,.2)`, borderTop:`2px solid ${TEAL}`, borderRadius:'50%', animation:'nd-spin 1s linear infinite', display:'inline-block' }} />
-            : <span style={{ width:7, height:7, borderRadius:'50%', background: apiOk ? GREEN : AMBER, boxShadow:`0 0 8px ${apiOk ? GREEN : AMBER}`, display:'inline-block' }} />
-          }
-          {loading ? 'Synchro...' : apiOk ? 'API connectée' : 'Données de démonstration'}
+        <div style={{ display:'flex', alignItems:'center', gap:7, fontSize:11, fontFamily:"'JetBrains Mono',monospace", color: apiOk ? GREEN : AMBER }}>
+          <div style={{ width:6, height:6, borderRadius:'50%', background: apiOk ? GREEN : AMBER, boxShadow:`0 0 8px ${apiOk ? GREEN : AMBER}`, animation:'nd-pulse 2s ease-in-out infinite' }} />
+          {apiOk ? 'API connectée' : 'Hors ligne'}
         </div>
       </div>
 
-      {/* ── API ERROR BANNER ── */}
-      {apiOk === false && !loading && (
-        <div className="nd-anim" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'rgba(251,191,36,.07)', border:'1px solid rgba(251,191,36,.2)', borderRadius:14, padding:'12px 20px', marginBottom:18, gap:12 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:13, color:AMBER }}>
-            <span style={{ fontSize:18 }}>⚠️</span>
-            <span>API indisponible — données de démonstration affichées. Vérifiez que la table <code style={{ fontFamily:'monospace', background:'rgba(251,191,36,.1)', padding:'1px 6px', borderRadius:4 }}>reports</code> existe en base.</span>
-          </div>
-          <button className="nd-retry" onClick={loadStats} style={{ flexShrink:0, marginTop:0, padding:'8px 16px', fontSize:12 }}>
-            🔄 Réessayer
-          </button>
-        </div>
-      )}
-
-      {/* ── KPI CARDS ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14, marginBottom:20 }}>
+      {/* ── KPI ROW ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:12, marginBottom:20 }}>
         {[
-          { icon:'📄', value:total,  label:'Rapports soumis',  color:TEAL   },
-          { icon:'✅', value:valid,  label:'Rapports validés', color:GREEN  },
-          { icon:'⏳', value:pending,label:'En attente',       color:AMBER  },
-          { icon:'🔐', value:rssi,   label:'Avec RSSI',        color:BLUE   },
-          { icon:'📊', value:`${Math.round(avg)}%`, label:'Score moyen SSI', color:PURPLE },
-        ].map(({icon,value,label,color},i) => (
-          <div key={label} className="nd-stat nd-anim" style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:18, padding:'20px 18px', position:'relative', overflow:'hidden', boxShadow:'0 4px 20px rgba(0,0,0,.25)' }}>
-            <div style={{ position:'absolute', top:-12, right:-12, width:56, height:56, borderRadius:'50%', background:color, opacity:.13, filter:'blur(16px)', animation:'nd-glow 3s ease-in-out infinite' }} />
-            <div style={{ width:38, height:38, borderRadius:12, background:`${color}18`, border:`1px solid ${color}28`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, marginBottom:12 }}>{icon}</div>
-            <div style={{ fontSize:26, fontWeight:900, color, fontFamily:"'Syne',sans-serif", lineHeight:1, marginBottom:5 }}>{value}</div>
-            <div style={{ fontSize:10, color:'#3d607a', fontWeight:600, letterSpacing:'.4px', textTransform:'uppercase' }}>{label}</div>
+          { icon:'📄', val:total,                 suf:'',  label:'Rapports total',  color:TEAL,   anim:'nd-anim-1' },
+          { icon:'✅', val:valid,                 suf:'',  label:'Validés',         color:GREEN,  anim:'nd-anim-2' },
+          { icon:'⏳', val:pending,               suf:'',  label:'En attente',      color:AMBER,  anim:'nd-anim-3' },
+          { icon:'🔐', val:rssi,                  suf:'',  label:'Avec RSSI',       color:BLUE,   anim:'nd-anim-4' },
+          { icon:'📊', val:Math.round(avg),       suf:'%', label:'Score SSI moyen', color:avgColor, anim:'nd-anim-5' },
+        ].map(({ icon, val, suf, label, color, anim }) => (
+          <div key={label} className={`nd-card nd-kpi ${anim}`} style={{ padding:'20px 18px', position:'relative', overflow:'hidden' }}>
+            {/* Glow */}
+            <div style={{ position:'absolute', inset:0, background:`radial-gradient(circle at 80% 20%, ${color}08 0%, transparent 60%)`, pointerEvents:'none' }} />
+            <div style={{ fontSize:20, marginBottom:12 }}>{icon}</div>
+            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:28, fontWeight:700, color, lineHeight:1, marginBottom:6 }}>
+              <AnimCount target={val} suffix={suf} />
+            </div>
+            <div style={{ fontSize:11, color:'#334155', fontWeight:500, letterSpacing:'.3px' }}>{label}</div>
           </div>
         ))}
       </div>
 
-      {/* ── CHARTS ROW ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18, marginBottom:18 }}>
-
-        {/* Bar chart — score par secteur */}
-        <div className="nd-anim" style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:20, overflow:'hidden' }}>
-          <SectionHeader icon="📈" title="Score moyen par secteur" iconBg={BLUE} />
-          <div style={{ padding:'20px' }}>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={sectors} margin={{ top:5, right:10, bottom:5, left:-10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.04)" />
-                <XAxis dataKey="sector" tick={{ fontSize:10, fill:'#3d607a', fontFamily:"'DM Sans',sans-serif" }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0,100]} tick={{ fontSize:10, fill:'#3d607a' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<BarTooltip />} cursor={{ fill:'rgba(99,210,190,.05)' }} />
-                <Bar dataKey="avg_score" radius={[6,6,0,0]}>
-                  {sectors.map((s,i) => (
-                    <Cell key={i} fill={scoreColor(parseFloat(s.avg_score))} fillOpacity={.8} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+      {/* ── EVOLUTION CHART (full width) ── */}
+      <div className="nd-card nd-anim-3" style={{ padding:'24px 24px 16px', marginBottom:20 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
+          <div>
+            <Label color={TEAL}>Évolution du score de conformité</Label>
+            <p style={{ fontSize:12, color:'#334155', marginTop:-10 }}>Score moyen hebdomadaire · 3 derniers mois</p>
           </div>
-        </div>
-
-        {/* Radar maturité */}
-        <div className="nd-anim" style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:20, overflow:'hidden' }}>
-          <SectionHeader icon="📡" title="Radar de maturité national" iconBg={TEAL} />
-          <div style={{ padding:'20px' }}>
-            <ResponsiveContainer width="100%" height={240}>
-              <RadarChart data={maturity} margin={{ top:10, right:30, bottom:10, left:30 }}>
-                <PolarGrid stroke="rgba(255,255,255,.08)" />
-                <PolarAngleAxis dataKey="axe" tick={{ fontSize:9, fill:'#4a6a88', fontWeight:600 }} />
-                <PolarRadiusAxis angle={90} domain={[0,100]} tick={{ fontSize:8, fill:'#2a4a62' }} tickCount={5} />
-                <Radar dataKey="valeur" stroke={TEAL} fill={TEAL} fillOpacity={0.12} strokeWidth={2} dot={{ fill:TEAL, r:3, stroke:'#07111e', strokeWidth:2 }} />
-                <Tooltip content={<RadarTooltip />} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* ── SECTOR TABLE ── */}
-      <div className="nd-anim" style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:20, overflow:'hidden', marginBottom:18 }}>
-        <SectionHeader icon="🏭" title="Détail par secteur d'activité" iconBg={PURPLE} />
-        <div style={{ padding:'8px 0' }}>
-          {sectors.map((s) => {
-            const score = parseFloat(s.avg_score) || 0;
-            const color = scoreColor(score);
-            return (
-              <div key={s.sector} className="nd-sector-row" style={{ padding:'12px 22px', borderBottom:`1px solid rgba(255,255,255,.03)` }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <div style={{ width:8, height:8, borderRadius:'50%', background:color, boxShadow:`0 0 6px ${color}` }} />
-                    <span style={{ fontSize:13, fontWeight:600, color:'#c8dff4' }}>{s.sector}</span>
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-                    <span style={{ fontSize:11, color:'#3d607a' }}>{s.total} rapport{s.total > 1 ? 's' : ''}</span>
-                    <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, color, fontSize:15 }}>{Math.round(score)}%</span>
-                  </div>
-                </div>
-                <MiniBar value={score} color={color} />
+          {trend !== null && (
+            <div style={{ textAlign:'right' }}>
+              <div style={{ fontSize:11, color:'#334155', marginBottom:4 }}>Tendance</div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:18, fontWeight:700, color: trend >= 0 ? GREEN : RED }}>
+                {trend >= 0 ? '↑' : '↓'} {Math.abs(trend).toFixed(1)}%
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* ── GLOBAL SUMMARY ── */}
-      <div className="nd-anim" style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:18, overflow:'hidden' }}>
-        <SectionHeader icon="🌍" title="Indicateurs globaux" iconBg={GREEN} />
-        <div style={{ padding:'18px 22px', display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20 }}>
+        {evolution.length === 0 ? (
+          <div style={{ height:240, display:'flex', alignItems:'center', justifyContent:'center', color:'#334155', fontSize:13, fontFamily:"'JetBrains Mono',monospace" }}>
+            Pas encore de données temporelles
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={evolution} margin={{ top:10, right:10, bottom:0, left:-20 }}>
+              <defs>
+                <linearGradient id="evoGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={TEAL} stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={TEAL} stopOpacity={0.01} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.04)" vertical={false} />
+              <XAxis
+                dataKey="period"
+                tick={{ fontSize:10, fill:'#334155', fontFamily:"'JetBrains Mono',monospace" }}
+                axisLine={false} tickLine={false}
+              />
+              <YAxis
+                domain={[0, 100]}
+                tick={{ fontSize:10, fill:'#334155', fontFamily:"'JetBrains Mono',monospace" }}
+                axisLine={false} tickLine={false}
+              />
+              <ReferenceLine y={75} stroke={`${GREEN}40`} strokeDasharray="4 4" label={{ value:'Seuil 75%', fill:`${GREEN}60`, fontSize:10, fontFamily:"'JetBrains Mono',monospace" }} />
+              <ReferenceLine y={55} stroke={`${AMBER}30`} strokeDasharray="4 4" />
+              <Tooltip content={<EvoTooltip />} cursor={{ stroke:`${TEAL}30`, strokeWidth:1 }} />
+              <Area
+                type="monotone"
+                dataKey="avg_score"
+                stroke={TEAL}
+                strokeWidth={2.5}
+                fill="url(#evoGrad)"
+                dot={{ fill:TEAL, r:4, stroke:BG, strokeWidth:2 }}
+                activeDot={{ r:6, fill:TEAL, stroke:BG, strokeWidth:2 }}
+              />
+              <Area
+                type="monotone"
+                dataKey="total"
+                stroke="transparent"
+                fill="transparent"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+
+        {/* Legend */}
+        <div style={{ display:'flex', gap:20, marginTop:12, paddingTop:12, borderTop:'1px solid rgba(255,255,255,.04)' }}>
           {[
-            { label:'Taux de validation',    value: total ? Math.round((valid/total)*100)  : 0, color:GREEN  },
-            { label:'Taux RSSI déployé',      value: total ? Math.round((rssi/total)*100)   : 0, color:TEAL   },
-            { label:'Score conformité moyen', value: Math.round(avg),                            color:PURPLE },
-          ].map(({label,value,color}) => (
-            <div key={label}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7 }}>
-                <span style={{ fontSize:11, color:'#3d607a', fontWeight:600, textTransform:'uppercase', letterSpacing:'.4px' }}>{label}</span>
-                <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, color, fontSize:15 }}>{value}%</span>
-              </div>
-              <MiniBar value={value} color={color} />
+            { color:GREEN, label:'≥ 75% Conforme' },
+            { color:AMBER, label:'55–74% Partiel' },
+            { color:RED,   label:'< 55% Non conforme' },
+          ].map(({ color, label }) => (
+            <div key={label} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#475569' }}>
+              <div style={{ width:8, height:8, borderRadius:'50%', background:color }} />
+              {label}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={{ marginTop:22, textAlign:'center', fontSize:11, color:'#1e3a52', letterSpacing:'.3px' }}>
-        ANCS Platform · Audit de Sécurité des Systèmes d'Information © 2026
+      {/* ── BOTTOM ROW : Bar chart + Sector table ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+
+        {/* Bar chart — score par secteur */}
+        <div className="nd-card nd-anim-4" style={{ padding:'24px' }}>
+          <Label color={BLUE}>Score moyen par secteur</Label>
+          {sectors.length === 0 ? (
+            <div style={{ height:220, display:'flex', alignItems:'center', justifyContent:'center', color:'#334155', fontSize:13 }}>Aucune donnée</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={sectors} margin={{ top:5, right:5, bottom:5, left:-20 }} barSize={28}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.04)" vertical={false} />
+                <XAxis
+                  dataKey="sector"
+                  tick={{ fontSize:9, fill:'#334155', fontFamily:"'Space Grotesk',sans-serif" }}
+                  axisLine={false} tickLine={false}
+                />
+                <YAxis domain={[0,100]} tick={{ fontSize:9, fill:'#334155' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<BarTooltip />} cursor={{ fill:'rgba(255,255,255,.03)' }} />
+                <Bar dataKey="avg_score" radius={[6,6,0,0]}>
+                  {sectors.map((s, i) => (
+                    <Cell key={i} fill={scoreColor(parseFloat(s.avg_score))} opacity={0.85} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Sector table */}
+        <div className="nd-card nd-anim-5" style={{ padding:'24px' }}>
+          <Label color={INDIGO}>Détail par secteur</Label>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {sectors.length === 0 ? (
+              <p style={{ color:'#334155', fontSize:13 }}>Aucun secteur disponible</p>
+            ) : sectors.map((s, i) => {
+              const score = parseFloat(s.avg_score) || 0;
+              const color = scoreColor(score);
+              return (
+                <div key={s.sector}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{ width:6, height:6, borderRadius:'50%', background:color, boxShadow:`0 0 6px ${color}` }} />
+                      <span style={{ fontSize:13, fontWeight:500, color:'#cbd5e1' }}>{s.sector}</span>
+                      <span style={{ fontSize:10, color:'#334155', fontFamily:"'JetBrains Mono',monospace" }}>{s.total}</span>
+                    </div>
+                    <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:700, color, fontSize:14 }}>{Math.round(score)}%</span>
+                  </div>
+                  <AnimBar value={score} color={color} delay={i * 80} />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Global indicators */}
+          <div style={{ marginTop:22, paddingTop:16, borderTop:'1px solid rgba(255,255,255,.05)', display:'flex', flexDirection:'column', gap:12 }}>
+            <Label color={GREEN}>Indicateurs globaux</Label>
+            {[
+              { label:'Taux de validation', value: total ? Math.round((valid/total)*100) : 0, color:GREEN  },
+              { label:'Taux RSSI déployé',  value: total ? Math.round((rssi/total)*100)  : 0, color:TEAL   },
+            ].map(({ label, value, color }, i) => (
+              <div key={label}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+                  <span style={{ fontSize:11, color:'#334155' }}>{label}</span>
+                  <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:700, color, fontSize:12 }}>{value}%</span>
+                </div>
+                <AnimBar value={value} color={color} delay={i * 100} />
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
+
+      {/* Footer */}
+      <div style={{ marginTop:28, textAlign:'center', fontSize:10, color:'#1e293b', letterSpacing:'.4px', fontFamily:"'JetBrains Mono',monospace" }}>
+        ANCS · Agence Nationale de la Cybersécurité · Tunisie © 2026
+      </div>
+
     </div>
   );
 }
