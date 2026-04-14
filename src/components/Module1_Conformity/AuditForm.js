@@ -756,7 +756,7 @@ export default function AuditForm() {
       </nav>
 
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'32px 20px' }}>
-      <div style={{ width:'100%', maxWidth:620 }}>
+        <div style={{ width:'100%', maxWidth:620 }}>
 
         {/* HEADER */}
         <div className="af-anim" style={{ background:'linear-gradient(135deg,#0c1f3a,#0a2540)', border:'1px solid rgba(99,210,190,.12)', borderRadius:22, padding:'22px 28px', marginBottom:20, position:'relative', overflow:'hidden', boxShadow:'0 10px 40px rgba(0,0,0,.4)' }}>
@@ -928,6 +928,7 @@ export default function AuditForm() {
 
         <div style={{ marginTop:18, textAlign:'center', fontSize:11, color:'#1a3248' }}>
           ANCS Platform · Audit de Sécurité des Systèmes d'Information © 2026
+        </div>
         </div>
       </div>
     </div>
