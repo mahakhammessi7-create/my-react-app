@@ -66,8 +66,8 @@ function FileUpload() {
 
   // 🔴 VOICI LA FONCTION À AJOUTER SI ELLE N'EXISTE PAS
   const goToAnalysis = () => {
-    console.log('🔄 Redirection vers analyse');
-    window.location.href = '/client/dashboard?tab=analyse';
+    console.log('🔄 Redirection vers accueil');
+    window.location.href = '/client/dashboard';
   };
 
   return (

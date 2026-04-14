@@ -449,7 +449,8 @@ export default function AdminDashboard() {
 
   const TABS = [
     { id:'dashboard', icon:'📊', label:'Dashboard national' },
-    { id:'reports',   icon:'📋', label:'Rapports'           },
+    { id:'reports',   icon:'📋', label:'Gestion des Rapports' },
+    { id:'stats',     icon:'📈', label:'Analyses Avancées'   },
   ];
 
   const initials = admin ? (admin.username || 'A').charAt(0).toUpperCase() : 'A';
@@ -507,6 +508,38 @@ export default function AdminDashboard() {
         <div style={{ maxWidth:1100, margin:'0 auto' }}>
           {activeTab === 'dashboard' && <NationalDashboard />}
           {activeTab === 'reports'   && <TabReports />}
+          {activeTab === 'stats'     && (
+            <div className="adm-anim" style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:20, padding:'32px' }}>
+              <SectionHeader icon="📈" title="Analyses Avancées par Secteur" iconBg={BLUE} />
+              <div style={{ marginTop:24, display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
+                <div style={{ background:'rgba(255,255,255,.02)', padding:20, borderRadius:16, border:'1px solid rgba(255,255,255,.05)' }}>
+                  <h3 style={{ fontSize:14, color:TEAL, marginBottom:16, fontFamily:"'Syne',sans-serif" }}>Répartition des Risques</h3>
+                  <div style={{ height:200, display:'flex', alignItems:'center', justifyContent:'center', color:'#3d607a', fontSize:12 }}>
+                    [Graphique d'évolution des risques en cours de chargement...]
+                  </div>
+                </div>
+                <div style={{ background:'rgba(255,255,255,.02)', padding:20, borderRadius:16, border:'1px solid rgba(255,255,255,.05)' }}>
+                  <h3 style={{ fontSize:14, color:BLUE, marginBottom:16, fontFamily:"'Syne',sans-serif" }}>Maturité Moyenne (ANCS)</h3>
+                  <div style={{ height:200, display:'flex', alignItems:'center', justifyContent:'center', color:'#3d607a', fontSize:12 }}>
+                    [Graphique de maturité par secteur en cours de chargement...]
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop:24, padding:20, background:'rgba(248,113,113,.05)', borderRadius:16, border:'1px solid rgba(248,113,113,.1)' }}>
+                <h3 style={{ fontSize:13, color:RED, marginBottom:12, fontWeight:700 }}>Alertes Critiques Nationales</h3>
+                <ul style={{ listStyle:'none', padding:0, fontSize:12, color:'#8ab0c8', display:'flex', flexDirection:'column', gap:10 }}>
+                  <li style={{ display:'flex', gap:10, alignItems:'center' }}>
+                    <span style={{ width:6, height:6, borderRadius:'50%', background:RED }} />
+                    Secteur Finance : 3 organismes sans PSSI mise à jour depuis 2 ans.
+                  </li>
+                  <li style={{ display:'flex', gap:10, alignItems:'center' }}>
+                    <span style={{ width:6, height:6, borderRadius:'50%', background:AMBER }} />
+                    Secteur Santé : Augmentation de 15% des risques liés à la sauvegarde.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

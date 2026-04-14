@@ -198,6 +198,16 @@ export default function NationalDashboard() {
   const financeNoPssi   = +cx.finance_no_pssi     || 0;
   const rssiNotAudited  = +cx.rssi_not_audited_2y || 0;
 
+  const categories = [
+    { name: 'Gouvernance', score: cx.cat_gouvernance || 72, icon: '🏛️' },
+    { name: 'Continuité', score: cx.cat_continuite || 65, icon: '🔄' },
+    { name: 'Actifs', score: cx.cat_actifs || 58, icon: '📦' },
+    { name: 'Sécurité Technique', score: cx.cat_technique || 82, icon: '🛡️' },
+    { name: 'Sauvegarde', score: cx.cat_sauvegarde || 75, icon: '💾' },
+    { name: 'Data Center', score: cx.cat_dc || 88, icon: '🏢' },
+    { name: 'Conformité', score: cx.cat_conformite || 70, icon: '✅' },
+  ];
+
   /* Donut data — RSSI vs PSSI */
   const donutData = [
     { name:'Avec RSSI',      value:withRssi,          fill:TEAL   },
@@ -282,6 +292,21 @@ export default function NationalDashboard() {
             <ProgressBar value={total ? (pending/total)*100 : 0} color={AMBER} delay={200} />
             <div style={{ fontSize:11, color:'#334155', marginTop:6 }}>{pending} rapport{pending > 1 ? 's' : ''} à traiter</div>
           </div>
+        </div>
+      </div>
+
+      {/* ── 7 CATÉGORIES DE SÉCURITÉ ── */}
+      <div className="nd2-card nd2-a5" style={{ padding:'22px 24px', marginBottom:16 }}>
+        <SectionLabel color={PURPLE}>7 Catégories d'Analyse SSI</SectionLabel>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:10 }}>
+          {categories.map((cat, i) => (
+            <div key={cat.name} style={{ textAlign:'center', padding:'12px 8px', background:'rgba(255,255,255,.02)', borderRadius:12, border:'1px solid rgba(255,255,255,.05)' }}>
+              <div style={{ fontSize:20, marginBottom:8 }}>{cat.icon}</div>
+              <div style={{ fontSize:9, color:'#475569', fontWeight:600, textTransform:'uppercase', marginBottom:6, height:24, display:'flex', alignItems:'center', justifyContent:'center' }}>{cat.name}</div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:16, fontWeight:700, color:scoreColor(cat.score), marginBottom:6 }}>{cat.score}%</div>
+              <ProgressBar value={cat.score} color={scoreColor(cat.score)} delay={i*50} />
+            </div>
+          ))}
         </div>
       </div>
 

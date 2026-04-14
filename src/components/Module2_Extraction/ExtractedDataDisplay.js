@@ -40,7 +40,7 @@ function ExtractedDataDisplay() {
         <div style={styles.statCard}><strong>Utilisateurs</strong><p>{data.user_count}</p></div>
       </div>
       <div style={styles.buttonGroup}>
-        <button onClick={() => navigate('/client/dashboard?tab=upload')} style={styles.uploadButton}>📤 Uploader un autre rapport</button>
+        <button onClick={() => navigate('/client/dashboard')} style={styles.uploadButton}>📤 Uploader un autre rapport</button>
       </div>
     </div>
   );

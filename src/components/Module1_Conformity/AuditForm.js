@@ -708,12 +708,11 @@ export default function AuditForm() {
   // ✅ FIX navigation : window.location.href force le rechargement du tab
   // navigate() depuis un composant enfant ne met pas toujours à jour
   // useSearchParams() du parent ClientDashboard
-  const goAnalyse = () => {
-    if (!localStorage.getItem('extractedData')) {
-      alert('Données non disponibles. Relancez la vérification.');
-      return;
-    }
-    window.location.href = '/client/dashboard?tab=analyse';
+  const handleLogout = () => {
+    localStorage.removeItem('extractedData');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/');
   };
   const reset = () => {
     setFile(null); setStatus('idle'); setProgress(0);
@@ -724,9 +723,39 @@ export default function AuditForm() {
   const onDragLeave = () => setDrag(false);
   const onDrop      = (e) => { e.preventDefault(); setDrag(false); selectFile(e.dataTransfer.files[0]); };
 
+  const initials = user
+    ? (user.username || user.company_name || 'U').charAt(0).toUpperCase()
+    : 'U';
+
   /* ══ RENDER ══ */
   return (
-    <div className="af-root" style={{ minHeight:'100vh', background:BG, color:'#e2f0ff', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'32px 20px' }}>
+    <div className="af-root" style={{ minHeight:'100vh', background:BG, color:'#e2f0ff' }}>
+      {/* ══ NAVBAR ══ */}
+      <nav style={{
+        background:'rgba(8,20,36,.92)',
+        backdropFilter:'blur(16px)',
+        borderBottom:'1px solid rgba(255,255,255,.06)',
+        padding:'0 28px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        height:60, position:'sticky', top:0, zIndex:100,
+        boxShadow:'0 4px 24px rgba(0,0,0,.35)',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:34, height:34, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🏢</div>
+          <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:15, color:'#d4e8ff' }}>Espace Entreprise</span>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          {user && (
+            <div style={{ display:'flex', alignItems:'center', gap:9, padding:'5px 12px', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.07)', borderRadius:99 }}>
+              <div style={{ width:26, height:26, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800 }}>{initials}</div>
+              <span style={{ fontSize:12, color:'#4a6a88' }}>{user.company_name || user.username || user.email}</span>
+            </div>
+          )}
+          <button onClick={handleLogout} style={{ padding:'8px 16px', borderRadius:10, background:'rgba(248,113,113,.1)', color:'#f87171', border:'1px solid rgba(248,113,113,.2)', fontSize:12, fontWeight:600, cursor:'pointer' }}>Déconnexion</button>
+        </div>
+      </nav>
+
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'32px 20px' }}>
       <div style={{ width:'100%', maxWidth:620 }}>
 
         {/* HEADER */}
@@ -884,8 +913,7 @@ export default function AuditForm() {
         {/* ACTIONS */}
         {(status==='ok'||status==='fail') && (
           <div className="af-anim" style={{ display:'flex', gap:12 }}>
-            <button className="af-btn-ghost" onClick={reset}>🔄 Nouvel upload</button>
-            {status==='ok' && <button className="af-btn-green" onClick={goAnalyse}>📊 Voir l'analyse →</button>}
+            <button className="af-btn-ghost" style={{ flex: 1 }} onClick={reset}>🔄 Nouvel upload</button>
           </div>
         )}
 
