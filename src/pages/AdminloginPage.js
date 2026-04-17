@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
@@ -127,7 +128,7 @@ export default function AdminLoginPage() {
       } catch { localStorage.clear(); }
     }
     return () => document.getElementById('al-styles')?.remove();
-  }, []);
+  }, [navigate]);
 
   const validate = () => {
     const errs = { email: !email.includes('@'), password: password.length < 6 };

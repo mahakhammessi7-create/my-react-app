@@ -1,3 +1,7 @@
+
+
+
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
@@ -133,7 +137,7 @@ export default function LoginPage() {
       } catch { localStorage.clear(); }
     }
     return () => document.getElementById('lp-styles')?.remove();
-  }, []);
+  }, [navigate]);
 
   const validate = () => {
     const errs = { email: !email.includes('@'), password: password.length < 6 };

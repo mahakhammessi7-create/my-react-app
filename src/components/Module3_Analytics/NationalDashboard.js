@@ -71,6 +71,8 @@ const RED    = '#f87171';
 const INDIGO = '#818cf8';
 const BLUE   = '#38bdf8';
 const ROSE   = '#fb7185';
+const PURPLE = '#8B5CF6';
+
 
 const scoreColor = s => +s >= 75 ? GREEN : +s >= 55 ? AMBER : RED;
 
