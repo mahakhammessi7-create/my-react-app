@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'https://pfe-backend-9eec.onrender.com/api',
+  baseURL: 'https://pfe-backend-9eec.onrender.com',
   timeout: 15000,
 });
 

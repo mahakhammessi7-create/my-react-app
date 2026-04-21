@@ -1,12 +1,9 @@
-
-
-
-
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import API from '../../services/api';
 import NationalDashboard from '../../components/Module3_Analytics/NationalDashboard';
+import UserManagement from './UserManagement';
+
 
 /* ══════════════════════════════════════════════
    STYLES
@@ -116,41 +113,15 @@ const CARD   = 'rgba(255,255,255,.028)';
 const BORDER = 'rgba(255,255,255,.07)';
 
 /* ══════════════════════════════════════════════
-   MOCK DATA (fallback si API indisponible)
-══════════════════════════════════════════════ */
-const MOCK_REPORTS = [
-  { id:1, company_name:'Société Nationale de Développement Financier', sector:'Finance',        upload_date:'2024-03-15', status:'valid',    compliance_score:85 },
-  { id:2, company_name:'Clinique El Manar',                            sector:'Santé',          upload_date:'2024-03-12', status:'pending',  compliance_score:61 },
-  { id:3, company_name:'Office National des Postes',                   sector:'Administration', upload_date:'2024-03-10', status:'valid',    compliance_score:74 },
-  { id:4, company_name:"Société Tunisienne de l'Électricité",          sector:'Énergie',        upload_date:'2024-03-08', status:'pending',  compliance_score:55 },
-  { id:5, company_name:'Tunisie Telecom',                              sector:'Télécoms',       upload_date:'2024-03-05', status:'valid',    compliance_score:79 },
-  { id:6, company_name:'Groupe Poulina',                               sector:'Industrie',      upload_date:'2024-03-01', status:'rejected', compliance_score:42 },
-  { id:7, company_name:"Banque de l'Habitat",                          sector:'Finance',        upload_date:'2024-02-28', status:'valid',    compliance_score:88 },
-  { id:8, company_name:'Hôpital Charles Nicolle',                      sector:'Santé',          upload_date:'2024-02-25', status:'pending',  compliance_score:63 },
-];
-
-const MOCK_STATS = {
-  total_users: 156,
-  valid_reports: 89,
-  pending_reports: 12,
-  avg_score: 72,
-  sector_stats: [
-    { sector: 'Finance', count: 45 },
-    { sector: 'Santé', count: 32 },
-    { sector: 'Énergie', count: 28 },
-    { sector: 'Administration', count: 51 }
-  ]
-};
-
-/* ══════════════════════════════════════════════
    PRIMITIVES
 ══════════════════════════════════════════════ */
 function StatusBadge({ status }) {
   const cfg = {
-    valid:    { color:GREEN,  label:'Validé'     },
-    pending:  { color:AMBER,  label:'En attente' },
-    rejected: { color:RED,    label:'Rejeté'     },
-  }[status] || { color:BLUE, label:status };
+    valid:     { color: GREEN, label: 'Validé'     },
+    validated: { color: GREEN, label: 'Validé'     },
+    pending:   { color: AMBER, label: 'En attente' },
+    rejected:  { color: RED,   label: 'Rejeté'     },
+  }[status] || { color: BLUE, label: status };
   return (
     <span style={{ display:'inline-flex', alignItems:'center', gap:5, background:`${cfg.color}14`, color:cfg.color, border:`1px solid ${cfg.color}28`, padding:'3px 10px', borderRadius:99, fontSize:11, fontWeight:700, letterSpacing:'.4px', textTransform:'uppercase', whiteSpace:'nowrap' }}>
       <span style={{ width:5, height:5, borderRadius:'50%', background:cfg.color, boxShadow:`0 0 5px ${cfg.color}` }} />
@@ -171,7 +142,7 @@ function SectionHeader({ icon, title, iconBg = RED }) {
 /* ══════════════════════════════════════════════
    MODAL DÉTAIL RAPPORT
 ══════════════════════════════════════════════ */
-function ReportModal({ report, onClose, onStatusChange }) {
+function ReportModal({ report, onClose, onStatusChange, navigate }) {
   if (!report) return null;
   const scoreColor = report.compliance_score >= 75 ? GREEN : report.compliance_score >= 55 ? AMBER : RED;
 
@@ -184,10 +155,7 @@ function ReportModal({ report, onClose, onStatusChange }) {
     <div className="adm-modal-bg" onClick={onClose}>
       <div style={{ background:'#0c1e34', border:'1px solid rgba(255,255,255,.08)', borderRadius:22, width:'100%', maxWidth:500, boxShadow:'0 32px 80px rgba(0,0,0,.7)', overflow:'hidden' }}
         onClick={e => e.stopPropagation()}>
-
-        {/* Header modal */}
         <div style={{ background:'linear-gradient(135deg,#0c1f3a,#0a2540)', padding:'22px 24px', position:'relative', overflow:'hidden' }}>
-          <div style={{ position:'absolute', left:0, right:0, height:2, background:'linear-gradient(90deg,transparent,rgba(248,113,113,.3),transparent)', animation:'adm-scan 3s linear infinite' }} />
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', position:'relative' }}>
             <div>
               <div style={{ fontFamily:"'Syne',sans-serif", fontSize:16, fontWeight:800, color:'#e4f2ff', marginBottom:6 }}>{report.company_name}</div>
@@ -200,10 +168,7 @@ function ReportModal({ report, onClose, onStatusChange }) {
             <button onClick={onClose} style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.09)', borderRadius:'50%', width:32, height:32, color:'#4a6a88', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>✕</button>
           </div>
         </div>
-
-        {/* Body */}
         <div style={{ padding:'20px 24px' }}>
-          {/* Score */}
           <div style={{ background:`${scoreColor}0d`, border:`1px solid ${scoreColor}22`, borderRadius:14, padding:'16px 20px', marginBottom:18, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div>
               <div style={{ fontSize:10, color:'#3d607a', textTransform:'uppercase', letterSpacing:'.5px', fontWeight:600, marginBottom:4 }}>Score de conformité</div>
@@ -211,21 +176,21 @@ function ReportModal({ report, onClose, onStatusChange }) {
             </div>
             <div style={{ fontSize:24 }}>📊</div>
           </div>
-
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:24 }}>
             <div style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.05)', borderRadius:12, padding:'12px 14px' }}>
               <div style={{ fontSize:10, color:'#3d607a', textTransform:'uppercase', fontWeight:600, marginBottom:5 }}>ID Rapport</div>
-              <div style={{ fontSize:13, color:'#8ab0c8', fontWeight:500 }}>#RPT-{report.id.toString().padStart(4,'0')}</div>
+              <div style={{ fontSize:13, color:'#8ab0c8', fontWeight:500 }}>#RPT-{String(report.id).padStart(4,'0')}</div>
             </div>
             <div style={{ background:'rgba(255,255,255,.02)', border:'1px solid rgba(255,255,255,.05)', borderRadius:12, padding:'12px 14px' }}>
               <div style={{ fontSize:10, color:'#3d607a', textTransform:'uppercase', fontWeight:600, marginBottom:5 }}>Date de dépôt</div>
-              <div style={{ fontSize:13, color:'#8ab0c8', fontWeight:500 }}>{report.upload_date}</div>
+              <div style={{ fontSize:13, color:'#8ab0c8', fontWeight:500 }}>
+                {report.upload_date ? new Date(report.upload_date).toLocaleDateString('fr-FR') : '—'}
+              </div>
             </div>
           </div>
-
           <div style={{ borderTop:'1px solid rgba(255,255,255,.05)', paddingTop:20, display:'flex', gap:12 }}>
-            <button className="adm-action-btn" onClick={()=>changeStatus('valid')} style={{ flex:1, padding:12, background:GREEN, color:'#07111e' }}>Valider</button>
-            <button className="adm-action-btn" onClick={()=>changeStatus('rejected')} style={{ flex:1, padding:12, background:'rgba(248,113,113,.15)', color:RED, border:`1px solid ${RED}33` }}>Rejeter</button>
+            <button className="adm-action-btn" onClick={()=>changeStatus('validated')} style={{ flex:1, padding:12, background:GREEN, color:'#07111e' }}>Valider</button>
+            <button className="adm-action-btn" onClick={()=>changeStatus('rejected')}  style={{ flex:1, padding:12, background:'rgba(248,113,113,.15)', color:RED, border:`1px solid ${RED}33` }}>Rejeter</button>
           </div>
         </div>
       </div>
@@ -244,6 +209,7 @@ export default function AdminDashboard() {
   const [reports,   setReports]   = useState([]);
   const [stats,     setStats]     = useState(null);
   const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);
   const [query,     setQuery]     = useState('');
   const [filterSec, setFilterSec] = useState('All');
   const [selected,  setSelected]  = useState(null);
@@ -259,17 +225,32 @@ export default function AdminDashboard() {
 
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
       try {
         const [rRes, sRes] = await Promise.all([
-          API.get('/admin/reports'),
-          API.get('/admin/stats')
+          API.get('/reports/all'),
+          API.get('/stats/national'),
         ]);
-        setReports(rRes.data && rRes.data.length > 0 ? rRes.data : MOCK_REPORTS);
-        setStats(sRes.data || MOCK_STATS);
+
+        const reportsData = rRes.data?.data || rRes.data || [];
+        setReports(reportsData);
+
+        const globalStats = sRes.data?.global || {};
+        setStats({
+          total_users:     parseInt(globalStats.total_organisms)  || 0,
+          valid_reports:   parseInt(globalStats.validated_count)  || 0,
+          pending_reports: parseInt(globalStats.pending_count)    || 0,
+          avg_score:       parseFloat(globalStats.avg_score)      || 0,
+          sector_stats:    sRes.data?.sectors?.map(s => ({
+            sector: s.sector,
+            count:  parseInt(s.total) || 0,
+          })) || [],
+        });
       } catch (err) {
-        console.error("Fetch error, using mock data:", err);
-        setReports(MOCK_REPORTS);
-        setStats(MOCK_STATS);
+        console.error('Fetch error:', err);
+        setError('Impossible de charger les données. Vérifiez que le backend est démarré.');
+        setReports([]);
+        setStats({ total_users:0, valid_reports:0, pending_reports:0, avg_score:0, sector_stats:[] });
       } finally {
         setLoading(false);
       }
@@ -279,10 +260,10 @@ export default function AdminDashboard() {
 
   const updateStatus = async (id, status) => {
     try {
-      await API.patch(`/admin/reports/${id}`, { status });
+      await API.patch(`/reports/${id}/status`, { status });
       setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
     } catch (err) {
-      alert("Erreur lors de la mise à jour");
+      alert('Erreur lors de la mise à jour du statut');
     }
   };
 
@@ -292,12 +273,14 @@ export default function AdminDashboard() {
   };
 
   const filtered = reports.filter(r => {
-    const mQuery = r.company_name.toLowerCase().includes(query.toLowerCase());
-    const mSector = filterSec === 'All' || r.sector === filterSec;
+    const name   = (r.company_name || r.organism_name || '').toLowerCase();
+    const sector = r.sector || r.organism_sector || '';
+    const mQuery  = name.includes(query.toLowerCase());
+    const mSector = filterSec === 'All' || sector === filterSec;
     return mQuery && mSector;
   });
 
-  const sectors = ['All', ...new Set(reports.map(r => r.sector))];
+  const sectors = ['All', ...new Set(reports.map(r => r.sector || r.organism_sector).filter(Boolean))];
 
   if (loading) return (
     <div style={{ height:'100vh', background:'#07111e', display:'flex', alignItems:'center', justifyContent:'center', color:RED }}>
@@ -307,7 +290,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="adm-root" style={{ background:'#07111e', minHeight:'100vh', color:'#e2f0ff' }}>
-      
+
       {/* ── TOP NAV ── */}
       <nav style={{ height:70, borderBottom:'1px solid rgba(255,255,255,.06)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 32px', background:'rgba(7,17,30,.8)', backdropFilter:'blur(12px)', position:'sticky', top:0, zIndex:100 }}>
         <div style={{ display:'flex', alignItems:'center', gap:40 }}>
@@ -315,14 +298,14 @@ export default function AdminDashboard() {
             <div style={{ width:36, height:36, background:'linear-gradient(135deg,#f87171,#991b1b)', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, boxShadow:'0 8px 16px rgba(248,113,113,.2)' }}>🛡️</div>
             <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:17, letterSpacing:'-.5px' }}>ANCS <span style={{ color:RED }}>Admin</span></div>
           </div>
-          
           <div style={{ display:'flex', gap:6 }}>
-            <button className={`adm-nav-btn ${activeTab==='overview'?'active':''}`} onClick={()=>setSearchParams({tab:'overview'})}>Vue d'ensemble</button>
-            <button className={`adm-nav-btn ${activeTab==='reports'?'active':''}`} onClick={()=>setSearchParams({tab:'reports'})}>Rapports reçus</button>
+            {/* ✅ All tabs use setSearchParams — nav never disappears */}
+            <button className={`adm-nav-btn ${activeTab==='overview'?'active':''}`}   onClick={()=>setSearchParams({tab:'overview'})}>Vue d'ensemble</button>
+            <button className={`adm-nav-btn ${activeTab==='reports'?'active':''}`}    onClick={()=>setSearchParams({tab:'reports'})}>Rapports reçus</button>
             <button className={`adm-nav-btn ${activeTab==='analytics'?'active':''}`} onClick={()=>setSearchParams({tab:'analytics'})}>Analyses Nationales</button>
+            <button className={`adm-nav-btn ${activeTab==='users'?'active':''}`}      onClick={()=>setSearchParams({tab:'users'})}>Gestion utilisateurs</button>
           </div>
         </div>
-
         <div style={{ display:'flex', alignItems:'center', gap:20 }}>
           <div style={{ textAlign:'right', lineHeight:1.2 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#f87171' }}>Administrateur</div>
@@ -335,8 +318,20 @@ export default function AdminDashboard() {
       {/* ── CONTENT ── */}
       <main style={{ padding:32, maxWidth:1400, margin:'0 auto' }}>
 
-        {activeTab === 'analytics' ? (
+        {/* Error banner */}
+        {error && (
+          <div style={{ background:'rgba(248,113,113,.08)', border:'1px solid rgba(248,113,113,.2)', borderRadius:14, padding:'12px 20px', marginBottom:24, color:RED, fontSize:13 }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {/* ✅ Users tab — renders UserManagement component inline */}
+        {activeTab === 'users' ? (
+          <UserManagement />
+
+        ) : activeTab === 'analytics' ? (
           <NationalDashboard />
+
         ) : activeTab === 'reports' ? (
           <div className="adm-anim">
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:24 }}>
@@ -359,31 +354,35 @@ export default function AdminDashboard() {
               <table style={{ width:'100%', borderCollapse:'collapse', textAlign:'left' }}>
                 <thead>
                   <tr style={{ background:'rgba(255,255,255,.03)', borderBottom:'1px solid rgba(255,255,255,.06)' }}>
-                    {['Organisme', 'Secteur', 'Date dépôt', 'Score', 'Statut', 'Action'].map(h => (
+                    {['Organisme','Secteur','Date dépôt','Score','Statut','Action'].map(h => (
                       <th key={h} style={{ padding:'16px 22px', fontSize:11, fontWeight:700, color:'#4a6a88', textTransform:'uppercase', letterSpacing:'.5px' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(r => (
-                    <tr key={r.id} className="adm-tr" style={{ borderBottom:'1px solid rgba(255,255,255,.03)' }}>
-                      <td style={{ padding:'18px 22px' }}>
-                        <div style={{ fontSize:14, fontWeight:600, color:'#e2f0ff' }}>{r.company_name}</div>
-                        <div style={{ fontSize:11, color:'#3d607a', marginTop:2 }}>ID: #RPT-{r.id.toString().padStart(4,'0')}</div>
-                      </td>
-                      <td style={{ padding:'18px 22px', fontSize:13, color:'#8ab0c8' }}>{r.sector}</td>
-                      <td style={{ padding:'18px 22px', fontSize:13, color:'#8ab0c8' }}>{r.upload_date}</td>
-                      <td style={{ padding:'18px 22px' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                          <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:15, color:r.compliance_score >= 75 ? GREEN : r.compliance_score >= 55 ? AMBER : RED }}>{r.compliance_score}%</div>
-                        </div>
-                      </td>
-                      <td style={{ padding:'18px 22px' }}><StatusBadge status={r.status} /></td>
-                      <td style={{ padding:'18px 22px' }}>
-                        <button className="adm-action-btn" onClick={()=>setSelected(r)} style={{ background:'rgba(255,255,255,.06)', color:'#8ab0c8', border:'1px solid rgba(255,255,255,.1)' }}>Détails</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtered.map(r => {
+                    const name   = r.company_name || r.organism_name || '—';
+                    const sector = r.sector       || r.organism_sector || '—';
+                    const score  = r.compliance_score || 0;
+                    const date   = r.upload_date ? new Date(r.upload_date).toLocaleDateString('fr-FR') : '—';
+                    return (
+                      <tr key={r.id} className="adm-tr" style={{ borderBottom:'1px solid rgba(255,255,255,.03)' }}>
+                        <td style={{ padding:'18px 22px' }}>
+                          <div style={{ fontSize:14, fontWeight:600, color:'#e2f0ff' }}>{name}</div>
+                          <div style={{ fontSize:11, color:'#3d607a', marginTop:2 }}>ID: #RPT-{String(r.id).padStart(4,'0')}</div>
+                        </td>
+                        <td style={{ padding:'18px 22px', fontSize:13, color:'#8ab0c8' }}>{sector}</td>
+                        <td style={{ padding:'18px 22px', fontSize:13, color:'#8ab0c8' }}>{date}</td>
+                        <td style={{ padding:'18px 22px' }}>
+                          <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:15, color: score>=75?GREEN:score>=55?AMBER:RED }}>{score}%</span>
+                        </td>
+                        <td style={{ padding:'18px 22px' }}><StatusBadge status={r.status} /></td>
+                        <td style={{ padding:'18px 22px' }}>
+                          <button className="adm-action-btn" onClick={()=>setSelected({...r, company_name:name, sector})} style={{ background:'rgba(255,255,255,.06)', color:'#8ab0c8', border:'1px solid rgba(255,255,255,.1)' }}>Détails</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {filtered.length === 0 && (
@@ -394,7 +393,9 @@ export default function AdminDashboard() {
               )}
             </div>
           </div>
+
         ) : (
+          /* ── VUE D'ENSEMBLE ── */
           <div className="adm-anim">
             <div style={{ marginBottom:32 }}>
               <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:28, fontWeight:800, marginBottom:8 }}>Dashboard <span style={{ color:RED }}>Overview</span></h1>
@@ -403,10 +404,10 @@ export default function AdminDashboard() {
 
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:24, marginBottom:32 }}>
               {[
-                { label:'Organismes inscrits', val:stats?.total_users || 0, color:BLUE, icon:'🏢' },
-                { label:'Rapports validés',   val:stats?.valid_reports || 0, color:GREEN, icon:'✅' },
-                { label:'En attente',         val:stats?.pending_reports || 0, color:AMBER, icon:'⏳' },
-                { label:'Score Moyen',        val:`${stats?.avg_score || 0}%`, color:RED, icon:'📈' },
+                { label:'Organismes inscrits', val: stats?.total_users     || 0,    color:BLUE,  icon:'🏢' },
+                { label:'Rapports validés',    val: stats?.valid_reports   || 0,    color:GREEN, icon:'✅' },
+                { label:'En attente',          val: stats?.pending_reports || 0,    color:AMBER, icon:'⏳' },
+                { label:'Score Moyen',         val: `${Math.round(stats?.avg_score || 0)}%`, color:RED, icon:'📈' },
               ].map((s,i) => (
                 <div key={i} className="adm-stat" style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:24, padding:28, position:'relative', overflow:'hidden' }}>
                   <div style={{ position:'absolute', top:-20, right:-20, fontSize:80, opacity:.03 }}>{s.icon}</div>
@@ -421,32 +422,41 @@ export default function AdminDashboard() {
               <div style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:24, overflow:'hidden' }}>
                 <SectionHeader icon="📊" title="Répartition par secteur" iconBg={BLUE} />
                 <div style={{ padding:24 }}>
-                  {stats?.sector_stats?.map((s,i) => (
+                  {stats?.sector_stats?.length > 0 ? stats.sector_stats.map((s,i) => (
                     <div key={i} className="adm-sector-row" style={{ marginBottom:18 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8, fontSize:13 }}>
                         <span style={{ fontWeight:600 }}>{s.sector}</span>
-                        <span style={{ color:'#4a6a88' }}>{s.count} organismes</span>
+                        <span style={{ color:'#4a6a88' }}>{s.count} rapport{s.count>1?'s':''}</span>
                       </div>
                       <div style={{ height:8, background:'rgba(255,255,255,.05)', borderRadius:99, overflow:'hidden' }}>
-                        <div style={{ height:'100%', width:`${(s.count / stats.total_users) * 100}%`, background:BLUE, borderRadius:99 }} />
+                        <div style={{ height:'100%', width:`${stats.total_users ? (s.count/stats.total_users)*100 : 0}%`, background:BLUE, borderRadius:99 }} />
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <div style={{ color:'#3d607a', fontSize:13, textAlign:'center', padding:20 }}>Aucune donnée disponible</div>
+                  )}
                 </div>
               </div>
 
               <div style={{ background:CARD, border:`1px solid ${BORDER}`, borderRadius:24, overflow:'hidden' }}>
                 <SectionHeader icon="⚡" title="Dernières Activités" iconBg={AMBER} />
                 <div style={{ padding:24 }}>
-                  {reports.slice(0,5).map((r,i) => (
-                    <div key={i} style={{ display:'flex', gap:14, marginBottom:20, paddingBottom:16, borderBottom:i===4?'none':'1px solid rgba(255,255,255,.03)' }}>
-                      <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,.03)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>📄</div>
-                      <div>
-                        <div style={{ fontSize:13, fontWeight:600, color:'#e2f0ff' }}>Nouveau rapport : {r.company_name}</div>
-                        <div style={{ fontSize:11, color:'#3d607a', marginTop:3 }}>Déposé le {r.upload_date}</div>
+                  {reports.slice(0,5).map((r,i) => {
+                    const name = r.company_name || r.organism_name || 'Organisme inconnu';
+                    const date = r.upload_date ? new Date(r.upload_date).toLocaleDateString('fr-FR') : '—';
+                    return (
+                      <div key={i} style={{ display:'flex', gap:14, marginBottom:20, paddingBottom:16, borderBottom:i===4?'none':'1px solid rgba(255,255,255,.03)' }}>
+                        <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,.03)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>📄</div>
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:600, color:'#e2f0ff' }}>Nouveau rapport : {name}</div>
+                          <div style={{ fontSize:11, color:'#3d607a', marginTop:3 }}>Déposé le {date}</div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+                  {reports.length === 0 && (
+                    <div style={{ color:'#3d607a', fontSize:13, textAlign:'center', padding:20 }}>Aucune activité récente</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -454,9 +464,8 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* Detail Modal */}
-      {selected && <ReportModal report={selected} onClose={()=>setSelected(null)} onStatusChange={updateStatus} />}
-
+      {selected && <ReportModal report={selected} onClose={()=>setSelected(null)} onStatusChange={updateStatus} navigate={navigate} />}
     </div>
   );
 }
+

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import * as mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 import API from '../../services/api';
@@ -7,9 +7,6 @@ import API from '../../services/api';
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
-/* ══════════════════════════════════════════════
-   STYLES
-══════════════════════════════════════════════ */
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
 
@@ -71,6 +68,13 @@ const CSS = `
     border-bottom:1px solid rgba(255,255,255,.03); font-size:11px; color:#4a6a88;
   }
   .af-sub-check:last-child { border-bottom:none; }
+
+  .af-nav-link {
+    display:flex; align-items:center; gap:6px;
+    padding:7px 13px; border-radius:10px; text-decoration:none;
+    font-size:13px; font-weight:500; transition:all .2s; white-space:nowrap;
+  }
+  .af-nav-link:hover { background:rgba(255,255,255,.06); color:#8ab0c8 !important; }
 `;
 
 function inject() {
@@ -88,15 +92,10 @@ const GREEN= '#4ade80';
 const RED  = '#f87171';
 const AMBER= '#fbbf24';
 
-/* ══════════════════════════════════════════════
-   MODÈLE OFFICIEL ANCS — template_audit_securite_SI.docx
-   3 annexes obligatoires avec sous-sections vérifiées
-══════════════════════════════════════════════ */
 const ANNEXES = [
   {
     key:   'annexe1',
     label: 'Annexe 1 — Identification de l\'Organisme',
-    // Champs obligatoires de la table Annexe 1
     subChecks: [
       { label:'Nom de l\'organisme',  keywords:['nom de l\'organisme', 'nom_organisme', '[nom de l\'organisme]'] },
       { label:'Acronyme',             keywords:['acronyme'] },
@@ -104,54 +103,44 @@ const ANNEXES = [
       { label:'Statut',               keywords:['statut'] },
       { label:'Adresse Email',        keywords:['adresse email', 'email', '@'] },
     ],
-    minSubChecks: 3, // Au moins 3 champs sur 5 doivent être présents
+    minSubChecks: 3,
   },
   {
     key:   'annexe3',
     label: 'Annexe 3 — Description du Système d\'Information',
-    // 4 sous-sections obligatoires de l'Annexe 3
     subChecks: [
-      { label:'Applications',                  keywords:['applications', 'application', 'modules', 'dév. par'] },
-      { label:'Serveurs (par plateforme)',      keywords:['serveurs', 'serveur', 'système d\'exploitation', '@ip', 'rôle'] },
+      { label:'Applications',                     keywords:['applications', 'application', 'modules', 'dév. par'] },
+      { label:'Serveurs (par plateforme)',         keywords:['serveurs', 'serveur', 'système d\'exploitation', '@ip', 'rôle'] },
       { label:'Infrastructure Réseau & Sécurité', keywords:['infrastructure réseau', 'infrastructure réseau et sécurité', 'nature', 'marque', 'firewall', 'routeur', 'switch'] },
-      { label:'Postes de travail',             keywords:['postes de travail', 'poste de travail', 'système d\'exploitation', 'nombre'] },
+      { label:'Postes de travail',                keywords:['postes de travail', 'poste de travail', 'système d\'exploitation', 'nombre'] },
     ],
     minSubChecks: 3,
   },
   {
     key:   'annexe7',
     label: 'Annexe 7 — Indicateurs de Sécurité',
-    // Classes obligatoires de l'Annexe 7
     subChecks: [
-      { label:'Organisation & RSSI',            keywords:['nomination officielle rssi', 'rssi', 'cellule sécurité', 'comité sécurité'] },
-      { label:'PSSI',                           keywords:['pssi', 'existence formelle pssi', 'maintien de la pssi'] },
-      { label:'Gestion de la continuité (PCA/PRA)', keywords:['pca', 'pra', 'continuité', 'site secours', 'organisation de crise'] },
-      { label:'Gestion des actifs',             keywords:['gestion des actifs', 'inventaire complet', 'classification'] },
-      { label:'Gestion des risques SI',         keywords:['gestion des risques', 'risques si', 'risques si métier'] },
-      { label:'Gestion des incidents',          keywords:['gestion des incidents', 'cellule de gestion des incidents'] },
-      { label:'Gestion des sauvegardes',        keywords:['gestion des sauvegardes', 'politique formelle de sauvegarde', 'sauvegarde'] },
-      { label:'Contrôle d\'accès logique',      keywords:['contrôle d\'accès', 'contrôleur de domaines', 'vlan', 'proxy'] },
-      { label:'Protection antivirale',          keywords:['protection antivirale', 'antivirale', 'antivirus'] },
-      { label:'Sécurité physique DC',           keywords:['data-center', 'datacenter', 'local data-center', 'climatisation', 'onduleurs'] },
+      { label:'Organisation & RSSI',               keywords:['nomination officielle rssi', 'rssi', 'cellule sécurité', 'comité sécurité'] },
+      { label:'PSSI',                              keywords:['pssi', 'existence formelle pssi', 'maintien de la pssi'] },
+      { label:'Gestion de la continuité (PCA/PRA)',keywords:['pca', 'pra', 'continuité', 'site secours', 'organisation de crise'] },
+      { label:'Gestion des actifs',                keywords:['gestion des actifs', 'inventaire complet', 'classification'] },
+      { label:'Gestion des risques SI',            keywords:['gestion des risques', 'risques si', 'risques si métier'] },
+      { label:'Gestion des incidents',             keywords:['gestion des incidents', 'cellule de gestion des incidents'] },
+      { label:'Gestion des sauvegardes',           keywords:['gestion des sauvegardes', 'politique formelle de sauvegarde', 'sauvegarde'] },
+      { label:'Contrôle d\'accès logique',         keywords:['contrôle d\'accès', 'contrôleur de domaines', 'vlan', 'proxy'] },
+      { label:'Protection antivirale',             keywords:['protection antivirale', 'antivirale', 'antivirus'] },
+      { label:'Sécurité physique DC',              keywords:['data-center', 'datacenter', 'local data-center', 'climatisation', 'onduleurs'] },
     ],
-    minSubChecks: 6, // Au moins 6 classes sur 10
+    minSubChecks: 6,
   },
 ];
 
-/* ══════════════════════════════════════════════
-   LECTURE DU FICHIER
-   DOCX → mammoth HTML (préserve la structure des tableaux)
-   PDF  → pdfjs page par page
-══════════════════════════════════════════════ */
-
-// Lire DOCX en HTML pour préserver les tableaux
 async function readDocxHtml(file) {
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.convertToHtml({ arrayBuffer });
-  return result.value; // HTML string
+  return result.value;
 }
 
-// Lire DOCX en texte brut (pour la validation des mots-clés)
 async function readDocxText(file) {
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });
@@ -170,7 +159,6 @@ async function readPdf(file) {
   return fullText;
 }
 
-// Retourne { text, html } — text pour validation, html pour extraction des tableaux
 async function readFileContent(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   try {
@@ -189,12 +177,6 @@ async function readFileContent(file) {
   }
 }
 
-/* ══════════════════════════════════════════════
-   PARSING HTML DES TABLEAUX DOCX
-   Extrait les données structurées des tableaux Annexe 1, 3, 7
-══════════════════════════════════════════════ */
-
-// Parse toutes les tables HTML → tableau de tableaux de lignes
 function parseHtmlTables(html) {
   const parser  = new DOMParser();
   const doc     = parser.parseFromString(html, 'text/html');
@@ -208,11 +190,9 @@ function parseHtmlTables(html) {
   });
 }
 
-// Extraire Annexe 1 (table key-value : Nom organisme, Acronyme, Secteur...)
 function extractAnnexe1(tables) {
   const result = {};
   tables.forEach(table => {
-    // La table Annexe 1 a 2 colonnes : [Champ, Données]
     if (table.length >= 2 && table[0]?.[0]?.toLowerCase().includes('champ')) {
       table.slice(1).forEach(row => {
         if (row.length >= 2) {
@@ -232,13 +212,7 @@ function extractAnnexe1(tables) {
   return result;
 }
 
-/* ══════════════════════════════════════════════
-   HELPER : trouver la vraie ligne d'entête
-   Le rapport SNDF a une ligne titre fusionnée en row[0]
-   et la vraie entête en row[1] (ex: "Serveurs (par plateforme)" répété)
-══════════════════════════════════════════════ */
 function findHeader(table, requiredKeywords) {
-  // Essaie row[0] d'abord, puis row[1] si row[0] ne matche pas
   for (let ri = 0; ri <= Math.min(2, table.length - 1); ri++) {
     const h = table[ri].map(c => c.toLowerCase());
     if (requiredKeywords.every(kw => h.some(c => c.includes(kw)))) {
@@ -248,7 +222,6 @@ function findHeader(table, requiredKeywords) {
   return null;
 }
 
-// Extraire Annexe 3 — table Serveurs
 function extractServersFromTable(tables) {
   const servers = [];
   tables.forEach(table => {
@@ -278,7 +251,6 @@ function extractServersFromTable(tables) {
   return servers.filter(s => s.nom).slice(0, 20);
 }
 
-// Extraire Annexe 3 — table Applications
 function extractAppsFromTable(tables) {
   const apps = [];
   tables.forEach(table => {
@@ -309,7 +281,6 @@ function extractAppsFromTable(tables) {
   return apps.filter(a => a.nom).slice(0, 15);
 }
 
-// Extraire Annexe 3 — Infrastructure réseau
 function extractNetworkFromTable(tables) {
   const network = [];
   tables.forEach(table => {
@@ -337,17 +308,11 @@ function extractNetworkFromTable(tables) {
   return network.filter(n => n.nature).slice(0, 15);
 }
 
-// Extraire Annexe 7 — Indicateurs
-// ✅ FIX : header = "Classe / Indicateur" (pas "Classe") dans le rapport SNDF
 function extractIndicateurs(tables) {
   const indicators = [];
   let currentClass = '';
-
   tables.forEach(table => {
     if (table.length < 5) return;
-
-    // ✅ Cherche la table Annexe 7 : header contient "indicateur" ET "valeur"
-    // Peut être en row[0] ou row[1] (row[0] peut être un titre fusionné)
     let headerRow = null;
     let dataStart = 1;
     for (let ri = 0; ri <= 1; ri++) {
@@ -359,45 +324,28 @@ function extractIndicateurs(tables) {
       }
     }
     if (!headerRow) return;
-
-    // ✅ FIX : "Classe / Indicateur" → iClasse cherche "classe" dans la cellule
     const iClasse = headerRow.findIndex(h => h.includes('classe'));
     const iInd    = headerRow.findIndex(h => h.includes('indicateur') && !h.includes('classe'));
     const iVal    = headerRow.findIndex(h => h.includes('valeur'));
     const iCom    = headerRow.findIndex(h => h.includes('commentaire'));
-
-    // Si iInd = -1 (cas "Classe / Indicateur" dans une seule colonne → col 0 = classe+indicateur, col 1 = vrai indicateur)
-    const iIndFinal = iInd >= 0 ? iInd : 1;
+    const iIndFinal    = iInd >= 0 ? iInd : 1;
     const iClasseFinal = iClasse >= 0 ? iClasse : 0;
-
     table.slice(dataStart).forEach(row => {
       const classeCell = row[iClasseFinal]?.trim() || '';
       const indicateur = row[iIndFinal]?.trim() || '';
       const valeur     = iVal >= 0 ? (row[iVal]?.trim() || '') : '';
       const commentaire= iCom >= 0 ? (row[iCom]?.trim() || '') : '';
-
-      // Mettre à jour la classe courante si la cellule classe est remplie et différente
       if (classeCell && classeCell !== indicateur && classeCell.toLowerCase() !== 'valeur') {
         currentClass = classeCell;
       }
-
-      // Ignorer les lignes vides ou d'en-tête
       if (!indicateur || indicateur.toLowerCase() === 'indicateur' || indicateur === currentClass) return;
-      // Ignorer les lignes où l'indicateur = valeur = classe (ligne section)
       if (indicateur === valeur && valeur.length > 3) return;
-
       indicators.push({ classe: currentClass, indicateur, valeur, commentaire });
     });
   });
-
   return indicators;
 }
 
-
-/* ══════════════════════════════════════════════
-   CLASSIFICATION DES VALEURS ANNEXE 7
-   Formats : 1/0, Oui/Non, Totale/Partielle/Absence, texte libre
-══════════════════════════════════════════════ */
 function classifyValue(valeur) {
   if (!valeur || valeur.trim() === '') return 'vide';
   const v = valeur.trim().toLowerCase();
@@ -480,7 +428,6 @@ function buildRisquesFromIndicateurs(indicators, score) {
     const f = real.find(ind => kws.some(k => ind.indicateur.toLowerCase().includes(k.toLowerCase())));
     return f?.commentaire || '';
   };
-
   if (isNeg(['Maintien du PCA']))
     risques.push({ risque:'PCA non testé', probabilite:'Élevée', impact:'Critique', niv:'critique',
       desc: getComment(['Maintien du PCA']) || 'PCA non testé depuis plus de 2 ans' });
@@ -502,11 +449,8 @@ function buildRisquesFromIndicateurs(indicators, score) {
   if (isPartOrNeg(['Remp OS PCs EoL']))
     risques.push({ risque:'Postes en fin de vie (EoL)', probabilite:'Moyenne', impact:'Moyen', niv:'moyen',
       desc: getComment(['Remp OS PCs EoL']) || 'Systèmes EoL exposés aux vulnérabilités' });
-
   return risques.slice(0, 7);
 }
-
-
 
 const STEPS = [
   "Lecture du fichier…",
@@ -518,9 +462,6 @@ const STEPS = [
   "Calcul score final…",
 ];
 
-/* ══════════════════════════════════════════════
-   VALIDATION — basée sur les tableaux HTML
-══════════════════════════════════════════════ */
 function validateContent(text) {
   const lower     = text.toLowerCase();
   const wordCount = lower.split(/\s+/).filter(w => w.length > 3).length;
@@ -541,10 +482,6 @@ function validateContent(text) {
   return { isEmpty:false, results, errors, score, isValid:errors.length===0, wordCount };
 }
 
-/* ══════════════════════════════════════════════
-   CONSTRUCTION DES DONNÉES EXTRAITES
-   Priorité : tableaux HTML (DOCX) > regex text
-══════════════════════════════════════════════ */
 function buildExtractedData(validation, user, text, html) {
   const { score } = validation;
   const tables       = html ? parseHtmlTables(html) : [];
@@ -609,7 +546,8 @@ function buildExtractedData(validation, user, text, html) {
    COMPONENT
 ══════════════════════════════════════════════ */
 export default function AuditForm() {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const location  = useLocation();
 
   const [file,         setFile]         = useState(null);
   const [drag,         setDrag]         = useState(false);
@@ -641,45 +579,32 @@ export default function AuditForm() {
   const handleVerify = async () => {
     if (!file || status === 'loading') return;
     setStatus('loading'); setProgress(0); setStepIdx(0); setApiError('');
-
     try {
-      // Lecture
       setStepIdx(0); setProgress(10);
       const { text, html } = await readFileContent(file);
-
       setStepIdx(1); setProgress(22);
       await new Promise(r => setTimeout(r, 200));
-
       if (!text || text.trim().length === 0) {
         setErrors(['Fichier vide — aucun texte extrait. Le fichier est peut-être corrompu ou scanné sans OCR.']);
         setStatus('fail'); return;
       }
-
-      // Vérification des 3 annexes
       for (let i = 2; i <= 5; i++) {
         setStepIdx(i); setProgress(22 + i * 15);
         await new Promise(r => setTimeout(r, 350));
       }
-
       setStepIdx(6); setProgress(97);
       await new Promise(r => setTimeout(r, 250));
-
       const validation = validateContent(text);
       setCheckResults(validation.results);
       setScore(validation.score);
       setWordCount(validation.wordCount || 0);
       setProgress(100);
-
       if (validation.isEmpty || !validation.isValid) {
         setErrors(validation.errors);
         setStatus('fail'); return;
       }
-
-      // Conforme — extraire et sauvegarder
       const extracted = buildExtractedData(validation, user, text, html);
       localStorage.setItem('extractedData', JSON.stringify(extracted));
-
-      // ✅ Sauvegarder en base si token disponible
       const token = localStorage.getItem('token');
       if (token) {
         setStatus('saving');
@@ -696,24 +621,20 @@ export default function AuditForm() {
       } else {
         setApiError('Non connecté — rapport analysé en local uniquement.');
       }
-
       setStatus('ok');
-
     } catch (err) {
       setErrors([`Erreur lecture : ${err.message}`]);
       setStatus('fail');
     }
   };
 
-  // ✅ FIX navigation : window.location.href force le rechargement du tab
-  // navigate() depuis un composant enfant ne met pas toujours à jour
-  // useSearchParams() du parent ClientDashboard
   const handleLogout = () => {
     localStorage.removeItem('extractedData');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/');
   };
+
   const reset = () => {
     setFile(null); setStatus('idle'); setProgress(0);
     setErrors([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null);
@@ -727,9 +648,17 @@ export default function AuditForm() {
     ? (user.username || user.company_name || 'U').charAt(0).toUpperCase()
     : 'U';
 
-  /* ══ RENDER ══ */
+  const NAV_LINKS = [
+    { to:'/client/dashboard',     label:'Déposer un rapport', icon:'📤' },
+    { to:'/client/profile',       label:'Mon profil',         icon:'🏢' },
+    { to:'/client/notifications', label:'Notifications',      icon:'🔔' },
+    { to:'/client/guide',         label:'Guide de dépôt',     icon:'📖' },
+    { to:'/client/contact',       label:'Contacter ANCS',     icon:'💬' },
+  ];
+
   return (
     <div className="af-root" style={{ minHeight:'100vh', background:BG, color:'#e2f0ff' }}>
+
       {/* ══ NAVBAR ══ */}
       <nav style={{
         background:'rgba(8,20,36,.92)',
@@ -740,10 +669,36 @@ export default function AuditForm() {
         height:60, position:'sticky', top:0, zIndex:100,
         boxShadow:'0 4px 24px rgba(0,0,0,.35)',
       }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:34, height:34, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🏢</div>
-          <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:15, color:'#d4e8ff' }}>Espace Entreprise</span>
+        {/* Left: logo + nav links */}
+        <div style={{ display:'flex', alignItems:'center', gap:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:34, height:34, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🏢</div>
+            <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:15, color:'#d4e8ff' }}>Espace Entreprise</span>
+          </div>
+
+          {/* ✅ Nav links */}
+          <div style={{ display:'flex', gap:4 }}>
+            {NAV_LINKS.map(nl => {
+              const isActive = location.pathname === nl.to;
+              return (
+                <Link
+                  key={nl.to}
+                  to={nl.to}
+                  className="af-nav-link"
+                  style={{
+                    background: isActive ? 'rgba(99,210,190,.1)' : 'transparent',
+                    color:      isActive ? '#63d2be' : '#3d607a',
+                    border:     isActive ? '1px solid rgba(99,210,190,.2)' : '1px solid transparent',
+                  }}
+                >
+                  <span style={{ fontSize:13 }}>{nl.icon}</span>{nl.label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Right: user + logout */}
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           {user && (
             <div style={{ display:'flex', alignItems:'center', gap:9, padding:'5px 12px', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.07)', borderRadius:99 }}>
@@ -758,122 +713,84 @@ export default function AuditForm() {
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'32px 20px' }}>
         <div style={{ width:'100%', maxWidth:620 }}>
 
-        {/* HEADER */}
-        <div className="af-anim" style={{ background:'linear-gradient(135deg,#0c1f3a,#0a2540)', border:'1px solid rgba(99,210,190,.12)', borderRadius:22, padding:'22px 28px', marginBottom:20, position:'relative', overflow:'hidden', boxShadow:'0 10px 40px rgba(0,0,0,.4)' }}>
-          {[170,115].map((s,i) => (
-            <div key={i} style={{ position:'absolute', width:s, height:s, borderRadius:'50%', border:'1px solid rgba(99,210,190,.07)', right:-s/4, top:'50%', transform:'translateY(-50%)', animation:`af-slow ${20+i*8}s linear infinite` }} />
-          ))}
-          <div style={{ position:'absolute', left:0, right:0, height:2, background:'linear-gradient(90deg,transparent,rgba(99,210,190,.28),transparent)', animation:'af-scan 3.5s linear infinite', pointerEvents:'none' }} />
-          <div style={{ display:'flex', alignItems:'center', gap:16, position:'relative' }}>
-            <div style={{ width:50, height:50, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, boxShadow:'0 0 0 2px rgba(99,210,190,.22)' }}>📤</div>
-            <div>
-              <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:18, fontWeight:800, color:'#e4f2ff', marginBottom:4 }}>Upload de rapport d'audit</h1>
-              <p style={{ fontSize:12, color:'#3d607a' }}>Modèle officiel ANCS · Annexes 1, 3 et 7 vérifiées</p>
+          {/* HEADER */}
+          <div className="af-anim" style={{ background:'linear-gradient(135deg,#0c1f3a,#0a2540)', border:'1px solid rgba(99,210,190,.12)', borderRadius:22, padding:'22px 28px', marginBottom:20, position:'relative', overflow:'hidden', boxShadow:'0 10px 40px rgba(0,0,0,.4)' }}>
+            {[170,115].map((s,i) => (
+              <div key={i} style={{ position:'absolute', width:s, height:s, borderRadius:'50%', border:'1px solid rgba(99,210,190,.07)', right:-s/4, top:'50%', transform:'translateY(-50%)', animation:`af-slow ${20+i*8}s linear infinite` }} />
+            ))}
+            <div style={{ position:'absolute', left:0, right:0, height:2, background:'linear-gradient(90deg,transparent,rgba(99,210,190,.28),transparent)', animation:'af-scan 3.5s linear infinite', pointerEvents:'none' }} />
+            <div style={{ display:'flex', alignItems:'center', gap:16, position:'relative' }}>
+              <div style={{ width:50, height:50, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, boxShadow:'0 0 0 2px rgba(99,210,190,.22)' }}>📤</div>
+              <div>
+                <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:18, fontWeight:800, color:'#e4f2ff', marginBottom:4 }}>Upload de rapport d'audit</h1>
+                <p style={{ fontSize:12, color:'#3d607a' }}>Modèle officiel ANCS · Annexes 1, 3 et 7 vérifiées</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* CARD */}
-        <div className="af-anim" style={{ background:CARD, border:`1px solid ${status==='ok'?'rgba(74,222,128,.18)':status==='fail'?'rgba(248,113,113,.18)':BDR}`, borderRadius:22, padding:24, marginBottom:14, transition:'border-color .4s' }}>
-          <input id="af-fi" type="file" accept=".pdf,.docx" style={{ display:'none' }} onChange={e => selectFile(e.target.files[0])} />
+          {/* CARD */}
+          <div className="af-anim" style={{ background:CARD, border:`1px solid ${status==='ok'?'rgba(74,222,128,.18)':status==='fail'?'rgba(248,113,113,.18)':BDR}`, borderRadius:22, padding:24, marginBottom:14, transition:'border-color .4s' }}>
+            <input id="af-fi" type="file" accept=".pdf,.docx" style={{ display:'none' }} onChange={e => selectFile(e.target.files[0])} />
 
-          {/* Drop zone */}
-          <label htmlFor="af-fi" className={`af-drop${drag?' over':''}`} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
-            <div style={{ fontSize:46, display:'inline-block', marginBottom:12, animation:'af-float 3s ease-in-out infinite' }}>
-              {status==='ok'?'✅':status==='fail'?'❌':file?'📄':'📂'}
-            </div>
-            {file ? (
-              <>
-                <div style={{ fontFamily:"'Syne',sans-serif", fontSize:14, fontWeight:700, color:TEAL, marginBottom:4 }}>{file.name}</div>
-                <div style={{ fontSize:11, color:'#3d607a' }}>{(file.size/1024).toFixed(1)} Ko · Cliquez pour changer</div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize:14, fontWeight:600, color:'#4a6a88', marginBottom:6 }}>Glissez votre rapport ici</div>
-                <div style={{ fontSize:12, color:'#2a4a62', marginBottom:14 }}>ou cliquez pour sélectionner</div>
-                <div style={{ display:'inline-flex', gap:8 }}>
-                  {['PDF','DOCX'].map(f => <span key={f} style={{ fontSize:10, fontWeight:700, color:'#3d607a', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.07)', padding:'4px 12px', borderRadius:99 }}>{f}</span>)}
+            {/* Drop zone */}
+            <label htmlFor="af-fi" className={`af-drop${drag?' over':''}`} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+              <div style={{ fontSize:46, display:'inline-block', marginBottom:12, animation:'af-float 3s ease-in-out infinite' }}>
+                {status==='ok'?'✅':status==='fail'?'❌':file?'📄':'📂'}
+              </div>
+              {file ? (
+                <>
+                  <div style={{ fontFamily:"'Syne',sans-serif", fontSize:14, fontWeight:700, color:TEAL, marginBottom:4 }}>{file.name}</div>
+                  <div style={{ fontSize:11, color:'#3d607a' }}>{(file.size/1024).toFixed(1)} Ko · Cliquez pour changer</div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize:14, fontWeight:600, color:'#4a6a88', marginBottom:6 }}>Glissez votre rapport ici</div>
+                  <div style={{ fontSize:12, color:'#2a4a62', marginBottom:14 }}>ou cliquez pour sélectionner</div>
+                  <div style={{ display:'inline-flex', gap:8 }}>
+                    {['PDF','DOCX'].map(f => <span key={f} style={{ fontSize:10, fontWeight:700, color:'#3d607a', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.07)', padding:'4px 12px', borderRadius:99 }}>{f}</span>)}
+                  </div>
+                </>
+              )}
+            </label>
+
+            {/* PROGRESS */}
+            {(status==='loading'||status==='saving') && (
+              <div className="af-anim" style={{ marginTop:20 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <span style={{ fontSize:12, color:'#3d607a' }}>{status==='saving'?'💾 Enregistrement...':STEPS[stepIdx]}</span>
+                  <span style={{ fontSize:14, fontWeight:800, color:TEAL, fontFamily:"'Syne',sans-serif" }}>{progress}%</span>
                 </div>
-              </>
+                <div style={{ height:7, background:'rgba(255,255,255,.07)', borderRadius:99, overflow:'hidden' }}>
+                  <div style={{ width:`${progress}%`, height:'100%', background:`linear-gradient(90deg,${TEAL}55,${TEAL})`, borderRadius:99, transition:'width .4s ease', boxShadow:`0 0 12px ${TEAL}55` }} />
+                </div>
+                <div style={{ display:'flex', gap:5, marginTop:14, justifyContent:'center' }}>
+                  {STEPS.map((_,i) => (
+                    <div key={i} style={{ width:i<stepIdx?18:i===stepIdx?10:6, height:6, borderRadius:99, background:i<stepIdx?GREEN:i===stepIdx?TEAL:'rgba(255,255,255,.08)', transition:'all .3s' }} />
+                  ))}
+                </div>
+              </div>
             )}
-          </label>
 
-          {/* PROGRESS */}
-          {(status==='loading'||status==='saving') && (
-            <div className="af-anim" style={{ marginTop:20 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                <span style={{ fontSize:12, color:'#3d607a' }}>{status==='saving'?'💾 Enregistrement...':STEPS[stepIdx]}</span>
-                <span style={{ fontSize:14, fontWeight:800, color:TEAL, fontFamily:"'Syne',sans-serif" }}>{progress}%</span>
-              </div>
-              <div style={{ height:7, background:'rgba(255,255,255,.07)', borderRadius:99, overflow:'hidden' }}>
-                <div style={{ width:`${progress}%`, height:'100%', background:`linear-gradient(90deg,${TEAL}55,${TEAL})`, borderRadius:99, transition:'width .4s ease', boxShadow:`0 0 12px ${TEAL}55` }} />
-              </div>
-              <div style={{ display:'flex', gap:5, marginTop:14, justifyContent:'center' }}>
-                {STEPS.map((_,i) => (
-                  <div key={i} style={{ width:i<stepIdx?18:i===stepIdx?10:6, height:6, borderRadius:99, background:i<stepIdx?GREEN:i===stepIdx?TEAL:'rgba(255,255,255,.08)', transition:'all .3s' }} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* SUCCESS */}
-          {status==='ok' && (
-            <div className="af-anim" style={{ marginTop:18, padding:'16px 20px', background:'rgba(74,222,128,.07)', border:'1px solid rgba(74,222,128,.2)', borderRadius:14 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
-                <div style={{ width:40, height:40, borderRadius:'50%', background:'rgba(74,222,128,.15)', border:'1px solid rgba(74,222,128,.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>✅</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, color:GREEN, fontSize:15, marginBottom:3 }}>RAPPORT CONFORME</div>
-                  <div style={{ fontSize:12, color:apiError?AMBER:'#3d607a' }}>
-                    {apiError?`⚠️ ${apiError}`:`✅ Soumis à l'ANCS · ${wordCount} mots analysés`}
-                  </div>
-                </div>
-                <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, color:GREEN, fontSize:28, flexShrink:0 }}>{score}%</div>
-              </div>
-              {/* Résultats par annexe avec expand */}
-              <div style={{ borderTop:'1px solid rgba(74,222,128,.15)', paddingTop:12 }}>
-                {checkResults.map((r,i) => (
-                  <div key={i}>
-                    <div className="af-check-row" style={{ cursor:'pointer' }} onClick={() => setExpanded(expanded===i?null:i)}>
-                      <span style={{ fontSize:14, flexShrink:0 }}>{r.found?'✅':'❌'}</span>
-                      <span style={{ color:r.found?'#8ab0c8':RED, flex:1, fontWeight:600 }}>{r.label}</span>
-                      <span style={{ fontSize:11, color:'#2a4a62' }}>{r.foundCount}/{r.subChecks.length}</span>
-                      <span style={{ fontSize:10, color:'#2a4a62' }}>{expanded===i?'▲':'▼'}</span>
+            {/* SUCCESS */}
+            {status==='ok' && (
+              <div className="af-anim" style={{ marginTop:18, padding:'16px 20px', background:'rgba(74,222,128,.07)', border:'1px solid rgba(74,222,128,.2)', borderRadius:14 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
+                  <div style={{ width:40, height:40, borderRadius:'50%', background:'rgba(74,222,128,.15)', border:'1px solid rgba(74,222,128,.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>✅</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, color:GREEN, fontSize:15, marginBottom:3 }}>RAPPORT CONFORME</div>
+                    <div style={{ fontSize:12, color:apiError?AMBER:'#3d607a' }}>
+                      {apiError?`⚠️ ${apiError}`:`✅ Soumis à l'ANCS · ${wordCount} mots analysés`}
                     </div>
-                    {expanded===i && r.subResults && (
-                      <div style={{ marginBottom:4 }}>
-                        {r.subResults.map((s,j) => (
-                          <div key={j} className="af-sub-check">
-                            <span style={{ fontSize:12 }}>{s.found?'✅':'❌'}</span>
-                            <span style={{ color:s.found?'#4a6a88':RED }}>{s.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* FAIL */}
-          {status==='fail' && (
-            <div className="af-anim" style={{ marginTop:18, padding:'16px 20px', background:'rgba(248,113,113,.07)', border:'1px solid rgba(248,113,113,.2)', borderRadius:14 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-                <span style={{ fontSize:20 }}>❌</span>
-                <div>
-                  <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, color:RED, fontSize:15 }}>RAPPORT NON CONFORME</div>
-                  {score!==null && <div style={{ fontSize:12, color:'#3d607a', marginTop:2 }}>Score : {score}% · {wordCount} mots · 100% requis</div>}
+                  <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, color:GREEN, fontSize:28, flexShrink:0 }}>{score}%</div>
                 </div>
-              </div>
-              {/* Résultats par annexe */}
-              {checkResults.length > 0 && (
-                <div style={{ marginBottom:12 }}>
+                <div style={{ borderTop:'1px solid rgba(74,222,128,.15)', paddingTop:12 }}>
                   {checkResults.map((r,i) => (
                     <div key={i}>
                       <div className="af-check-row" style={{ cursor:'pointer' }} onClick={() => setExpanded(expanded===i?null:i)}>
                         <span style={{ fontSize:14, flexShrink:0 }}>{r.found?'✅':'❌'}</span>
-                        <span style={{ color:r.found?'#4a6a88':RED, flex:1, fontWeight:600 }}>{r.label}</span>
-                        <span style={{ fontSize:11, color:'#3d607a' }}>{r.foundCount}/{r.subChecks.length} sections</span>
+                        <span style={{ color:r.found?'#8ab0c8':RED, flex:1, fontWeight:600 }}>{r.label}</span>
+                        <span style={{ fontSize:11, color:'#2a4a62' }}>{r.foundCount}/{r.subChecks.length}</span>
                         <span style={{ fontSize:10, color:'#2a4a62' }}>{expanded===i?'▲':'▼'}</span>
                       </div>
                       {expanded===i && r.subResults && (
@@ -889,46 +806,82 @@ export default function AuditForm() {
                     </div>
                   ))}
                 </div>
-              )}
-              {errors.map((e,i) => (
-                <div key={i} style={{ display:'flex', gap:8, padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:12, color:'#8ab0c8', lineHeight:1.5 }}>
-                  <span style={{ color:RED, flexShrink:0 }}>●</span><span>{e}</span>
-                </div>
-              ))}
-              <div style={{ fontSize:11, color:'#3d607a', marginTop:10 }}>
-                Complétez les sections manquantes en utilisant le modèle officiel ANCS (Annexes 1, 3 et 7).
               </div>
-            </div>
-          )}
+            )}
 
-          {(status==='idle'||status==='loading') && (
-            <button className="af-btn-verify" onClick={handleVerify} disabled={!file||status==='loading'}>
-              {status==='loading'
-                ? <><span style={{ width:16, height:16, border:'2px solid rgba(7,17,30,.2)', borderTop:'2px solid #07111e', borderRadius:'50%', animation:'af-spin 1s linear infinite', flexShrink:0 }} />Analyse en cours...</>
-                : <>🔍 Vérifier la conformité</>}
-            </button>
-          )}
-        </div>
+            {/* FAIL */}
+            {status==='fail' && (
+              <div className="af-anim" style={{ marginTop:18, padding:'16px 20px', background:'rgba(248,113,113,.07)', border:'1px solid rgba(248,113,113,.2)', borderRadius:14 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+                  <span style={{ fontSize:20 }}>❌</span>
+                  <div>
+                    <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, color:RED, fontSize:15 }}>RAPPORT NON CONFORME</div>
+                    {score!==null && <div style={{ fontSize:12, color:'#3d607a', marginTop:2 }}>Score : {score}% · {wordCount} mots · 100% requis</div>}
+                  </div>
+                </div>
+                {checkResults.length > 0 && (
+                  <div style={{ marginBottom:12 }}>
+                    {checkResults.map((r,i) => (
+                      <div key={i}>
+                        <div className="af-check-row" style={{ cursor:'pointer' }} onClick={() => setExpanded(expanded===i?null:i)}>
+                          <span style={{ fontSize:14, flexShrink:0 }}>{r.found?'✅':'❌'}</span>
+                          <span style={{ color:r.found?'#4a6a88':RED, flex:1, fontWeight:600 }}>{r.label}</span>
+                          <span style={{ fontSize:11, color:'#3d607a' }}>{r.foundCount}/{r.subChecks.length} sections</span>
+                          <span style={{ fontSize:10, color:'#2a4a62' }}>{expanded===i?'▲':'▼'}</span>
+                        </div>
+                        {expanded===i && r.subResults && (
+                          <div style={{ marginBottom:4 }}>
+                            {r.subResults.map((s,j) => (
+                              <div key={j} className="af-sub-check">
+                                <span style={{ fontSize:12 }}>{s.found?'✅':'❌'}</span>
+                                <span style={{ color:s.found?'#4a6a88':RED }}>{s.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {errors.map((e,i) => (
+                  <div key={i} style={{ display:'flex', gap:8, padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:12, color:'#8ab0c8', lineHeight:1.5 }}>
+                    <span style={{ color:RED, flexShrink:0 }}>●</span><span>{e}</span>
+                  </div>
+                ))}
+                <div style={{ fontSize:11, color:'#3d607a', marginTop:10 }}>
+                  Complétez les sections manquantes en utilisant le modèle officiel ANCS (Annexes 1, 3 et 7).
+                </div>
+              </div>
+            )}
 
-        {/* ACTIONS */}
-        {(status==='ok'||status==='fail') && (
-          <div className="af-anim" style={{ display:'flex', gap:12 }}>
-            <button className="af-btn-ghost" style={{ flex: 1 }} onClick={reset}>🔄 Nouvel upload</button>
+            {(status==='idle'||status==='loading') && (
+              <button className="af-btn-verify" onClick={handleVerify} disabled={!file||status==='loading'}>
+                {status==='loading'
+                  ? <><span style={{ width:16, height:16, border:'2px solid rgba(7,17,30,.2)', borderTop:'2px solid #07111e', borderRadius:'50%', animation:'af-spin 1s linear infinite', flexShrink:0 }} />Analyse en cours...</>
+                  : <>🔍 Vérifier la conformité</>}
+              </button>
+            )}
           </div>
-        )}
 
-        {/* INFO */}
-        <div className="af-anim" style={{ marginTop:14, background:CARD, border:`1px solid ${BDR}`, borderRadius:16, padding:'13px 20px', display:'flex', gap:16, justifyContent:'center', flexWrap:'wrap' }}>
-          {[{i:'📎',t:'PDF ou DOCX'},{i:'🔍',t:'Contenu réel analysé'},{i:'📋',t:'Annexes 1, 3 & 7'},{i:'📡',t:'Transmis à l\'ANCS'}].map(({i,t}) => (
-            <div key={t} style={{ display:'flex', alignItems:'center', gap:7 }}>
-              <span>{i}</span><span style={{ fontSize:12, color:'#3d607a' }}>{t}</span>
+          {/* ACTIONS */}
+          {(status==='ok'||status==='fail') && (
+            <div className="af-anim" style={{ display:'flex', gap:12 }}>
+              <button className="af-btn-ghost" style={{ flex:1 }} onClick={reset}>🔄 Nouvel upload</button>
             </div>
-          ))}
-        </div>
+          )}
 
-        <div style={{ marginTop:18, textAlign:'center', fontSize:11, color:'#1a3248' }}>
-          ANCS Platform · Audit de Sécurité des Systèmes d'Information © 2026
-        </div>
+          {/* INFO */}
+          <div className="af-anim" style={{ marginTop:14, background:CARD, border:`1px solid ${BDR}`, borderRadius:16, padding:'13px 20px', display:'flex', gap:16, justifyContent:'center', flexWrap:'wrap' }}>
+            {[{i:'📎',t:'PDF ou DOCX'},{i:'🔍',t:'Contenu réel analysé'},{i:'📋',t:'Annexes 1, 3 & 7'},{i:'📡',t:'Transmis à l\'ANCS'}].map(({i,t}) => (
+              <div key={t} style={{ display:'flex', alignItems:'center', gap:7 }}>
+                <span>{i}</span><span style={{ fontSize:12, color:'#3d607a' }}>{t}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop:18, textAlign:'center', fontSize:11, color:'#1a3248' }}>
+            ANCS Platform · Audit de Sécurité des Systèmes d'Information © 2026
+          </div>
         </div>
       </div>
     </div>
