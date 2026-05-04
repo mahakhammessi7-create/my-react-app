@@ -220,7 +220,10 @@ export default function AdminDashboard() {
     if (!user) { navigate('/secure-access'); return; }
     try {
       const u = JSON.parse(user);
-      const isAdminUser = (role) => String(role || '').toLowerCase().includes('administrateur');
+      const isAdminUser = (role) => {
+        const r = String(role || '').toLowerCase().trim();
+        return r === 'admin' || r === 'administrateur';
+      };
       if (!isAdminUser(u.role)) navigate('/');
     } catch { navigate('/secure-access'); }
 

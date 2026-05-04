@@ -115,7 +115,7 @@ const CSS = `
 // ✅ Matches all possible role formats from the backend
 const isChargeEtude = (role) => {
   const r = String(role || '').toLowerCase().trim();
-  return r === 'charge_etude' || r === 'charge d\'étude' || r === 'chargedetude' || r === 'charge etude';
+  return r.includes('charge_etude') || r.includes('charge d\'étude') || r.includes('chargedetude') || r.includes('charge etude') || r.includes('technical_review');
 };
 
 export default function ChargeEtudeLoginPage() {
@@ -158,10 +158,10 @@ export default function ChargeEtudeLoginPage() {
       // ✅ FIX 3: destructure correctly — token & user are separate fields in res.data
       const { token, user } = res.data;
 
-      if (user?.role !== 'charge_etude') {
-       setError("Accès refusé.");
-       return;
-    }
+      if (!isChargeEtude(user?.role)) {
+        setError("Accès refusé.");
+        return;
+      }
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));

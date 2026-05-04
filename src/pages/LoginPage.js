@@ -127,7 +127,10 @@ export default function LoginPage() {
   const [fieldErr, setFieldErr] = useState({ email:false, password:false });
 
   const isAdminUser = (role) => String(role || '').toLowerCase().includes('administrateur');
-  const isChargeEtude = (role) => String(role || '').toLowerCase().includes('charge d\'étude');
+  const isChargeEtude = (role) => {
+    const r = String(role || '').toLowerCase().trim();
+    return r.includes('charge d\'étude') || r.includes('charge_etude') || r.includes('charge-etude') || r.includes('technical_review');
+  };
 
   useEffect(() => {
     injectLpStyles();

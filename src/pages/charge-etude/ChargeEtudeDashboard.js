@@ -152,23 +152,32 @@ export default function ChargeEtudeDashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (!userData) {
+    try {
+      const userData = localStorage.getItem('user');
+      if (!userData) {
+        navigate('/charge-etude-login');
+        return;
+      }
+
+      const u = JSON.parse(userData);
+      const isChargeEtude = (role) => {
+        const r = String(role || '').toLowerCase().trim();
+        return r.includes('charge d\'étude') || r.includes('charge_etude') || r.includes('charge-etude') || r.includes('technical_review');
+      };
+
+      if (!isChargeEtude(u.role)) {
+        navigate('/');
+        return;
+      }
+
+      setUser(u);
+    } catch (err) {
+      console.error("Dashboard init error:", err);
+      localStorage.removeItem('user');
       navigate('/charge-etude-login');
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    const u = JSON.parse(userData);
-    const isChargeEtude = (role) =>
-      String(role || '').toLowerCase().includes('charge d\'étude');
-
-    if (!isChargeEtude(u.role)) {
-      navigate('/');
-      return;
-    }
-
-    setUser(u);
-    setLoading(false);
   }, [navigate]);
 
   const handleLogout = () => {
