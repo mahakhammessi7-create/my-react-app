@@ -4,9 +4,10 @@ import LoginPage      from './pages/LoginPage';
 import RegisterPage   from './pages/RegisterPage';
 import AdminLoginPage from './pages/AdminloginPage';
 import ChargeEtudeLoginPage from './pages/ChargeEtudeLoginPage';
+import ResponsableLoginPage from './pages/ResponsableLoginPage';
 import AuditForm from './components/Module1_Conformity/AuditForm';
 import AdminDashboard  from './pages/admin/AdminDashboard';
-// ✅ Add these 4 imports (adjust paths to match where you saved the files)
+import ResponsableDashboard from './pages/responsable/ResponsableDashboard';
 import ClientDashboard   from './pages/client/ClientDashboard';
 import NotificationsPage from './pages/client/NotificationsPage';
 import GuidePage         from './pages/client/GuidePage';
@@ -26,12 +27,13 @@ function App() {
         <Route path="/secure-access"  element={<AdminLoginPage />}  />
         {/* ── Charge d'Étude login ── */}
         <Route path="/charge-etude-login"  element={<ChargeEtudeLoginPage />}  />
+        <Route path="/responsable-login"   element={<ResponsableLoginPage />}   />
         {/* ── Dashboards ── */}
         <Route path="/client/dashboard" element={<AuditForm />} />
         <Route path="/admin/dashboard"  element={<AdminDashboard />}  />
+        <Route path="/responsable/dashboard" element={<ResponsableDashboard />} />
         {/* ── Admin ── */}
-        <Route path="/admin/dashboard"  element={<AdminDashboard />}  />
-        <Route path="/admin/users"      element={<UserManagement />}  />  {/* ← ajoute cette ligne */}
+        <Route path="/admin/users"      element={<UserManagement />}  />
         {/* ── ✅ New client pages ── */}
         <Route path="/client/profile"        element={<ClientDashboard />}   />
         <Route path="/client/notifications"  element={<NotificationsPage />} />

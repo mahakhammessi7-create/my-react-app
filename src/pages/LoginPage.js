@@ -131,6 +131,10 @@ export default function LoginPage() {
     const r = String(role || '').toLowerCase().trim();
     return r.includes('charge d\'étude') || r.includes('charge_etude') || r.includes('charge-etude') || r.includes('technical_review');
   };
+  const isResponsable = (role) => {
+    const r = String(role || '').toLowerCase().trim();
+    return r.includes('responsable') || r.includes('suivi') || r.includes('responsable de suivi');
+  };
 
   useEffect(() => {
     injectLpStyles();
@@ -143,6 +147,8 @@ export default function LoginPage() {
           navigate('/admin/dashboard');
         } else if (isChargeEtude(u.role)) {
           navigate('/charge-etude/dashboard');
+        } else if (isResponsable(u.role)) {
+          navigate('/responsable/dashboard');
         } else {
           navigate('/client/dashboard');
         }
@@ -267,6 +273,12 @@ export default function LoginPage() {
         <p style={{ textAlign:'center', marginTop:16, fontSize:12, color:'#3d607a' }}>
           Accès Charge d'Étude ? {' '}
           <span className="lp-link" onClick={() => navigate('/charge-etude-login')} style={{ cursor:'pointer' }}>
+            Aller ici
+          </span>
+        </p>
+        <p style={{ textAlign:'center', marginTop:8, fontSize:12, color:'#3d607a' }}>
+          Accès Responsable de suivi ? {' '}
+          <span className="lp-link" onClick={() => navigate('/responsable-login')} style={{ cursor:'pointer' }}>
             Aller ici
           </span>
         </p>

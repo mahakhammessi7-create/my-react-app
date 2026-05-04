@@ -48,6 +48,7 @@ function Modal({ user, onClose, onSave }) {
             <label className="form-label">Rôle</label>
             <select className="form-input" value={form.role} onChange={e=>set("role",e.target.value)}>
               <option value="client">Client</option>
+              <option value="responsable">Responsable de suivi</option>
               <option value="admin">Admin</option>
             </select>
           </div>
@@ -175,6 +176,7 @@ export default function UserManagement() {
     {label:"UTILISATEURS INSCRITS", value:users.length,                                  accent:"#22d3ee"},
     {label:"COMPTES ACTIFS",        value:users.filter(u=>u.status==="active").length,   accent:"#4ade80"},
     {label:"ADMINISTRATEURS",       value:users.filter(u=>u.role==="admin").length,      accent:"#fbbf24"},
+    {label:"RESPONSABLES",          value:users.filter(u=>u.role==="responsable").length, accent:"#10b981"},
     {label:"COMPTES INACTIFS",      value:users.filter(u=>u.status==="inactive").length, accent:"#f87171"},
   ];
 
@@ -220,6 +222,7 @@ export default function UserManagement() {
             <select className="filter-select" value={filterRole} onChange={e=>setFilterRole(e.target.value)}>
               <option value="all">Tous les rôles</option>
               <option value="admin">Admin</option>
+              <option value="responsable">Responsable</option>
               <option value="client">Client</option>
             </select>
             <select className="filter-select" value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
@@ -255,7 +258,7 @@ export default function UserManagement() {
                   </td>
                   <td className="cell-muted">{u.organism}</td>
                   <td className="cell-muted">{u.sector}</td>
-                  <td><span className={`badge role-${u.role}`}>{u.role==="admin"?"Admin":"Client"}</span></td>
+                  <td><span className={`badge role-${u.role}`}>{u.role==="admin"?"Admin":u.role==="responsable"?"Responsable":"Client"}</span></td>
                   <td><span className={`badge status-${u.status}`}><span className="dot"/>{u.status==="active"?"Actif":u.status==="inactive"?"Inactif":"Suspendu"}</span></td>
                   <td className="cell-date">{u.lastLogin}</td>
                   <td>
@@ -324,6 +327,7 @@ const CSS = `
 .cell-date{color:#484f58;font-family:monospace;font-size:12px;}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.04em;font-family:'Rajdhani',sans-serif;}
 .role-admin{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.25);}
+.role-responsable{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2);}
 .role-client{background:rgba(34,211,238,.08);color:#22d3ee;border:1px solid rgba(34,211,238,.2);}
 .status-active{background:rgba(74,222,128,.08);color:#4ade80;border:1px solid rgba(74,222,128,.2);}
 .status-inactive{background:rgba(139,148,158,.08);color:#8b949e;border:1px solid rgba(139,148,158,.2);}
