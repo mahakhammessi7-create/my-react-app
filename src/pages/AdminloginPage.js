@@ -116,6 +116,8 @@ export default function AdminLoginPage() {
   const [error,    setError]    = useState('');
   const [fieldErr, setFieldErr] = useState({ email:false, password:false });
 
+  const isAdminUser = (role) => String(role || '').toLowerCase().includes('administrateur');
+
   useEffect(() => {
     injectAlStyles();
     // Si déjà connecté en admin → redirect direct
@@ -123,8 +125,8 @@ export default function AdminLoginPage() {
     if (user) {
       try {
         const u = JSON.parse(user);
-        if (u.role === 'admin') navigate('/admin/dashboard');
-        else navigate('/client/dashboard');
+        if (isAdminUser(u.role)) navigate('/admin/dashboard');
+        else navigate('/');
       } catch { localStorage.clear(); }
     }
     return () => document.getElementById('al-styles')?.remove();
@@ -146,8 +148,8 @@ export default function AdminLoginPage() {
       const res = await API.post('/auth/login', { email, password, userType: 'admin' });
       const { token, user } = res.data;
 
-      if (user.role !== 'admin') {
-        setError('Accès refusé. Ce portail est réservé aux administrateurs.');
+      if (!isAdminUser(user.role)) {
+        setError('Accès réservé aux administrateurs (rôle: administrateur)');
         return;
       }
 
@@ -240,6 +242,14 @@ export default function AdminLoginPage() {
             ? <><span style={{ width:16, height:16, border:'2px solid rgba(255,255,255,.25)', borderTop:'2px solid white', borderRadius:'50%', animation:'al-spin 1s linear infinite', flexShrink:0 }} />Authentification...</>
             : <>🛡️ Connexion sécurisée</>}
         </button>
+
+        {/* Charge d'Étude Link */}
+        <p style={{ textAlign:'center', marginTop:16, fontSize:12, color:'#5a2a2a' }}>
+          Accès Charge d'Étude ? {' '}
+          <a href="/charge-etude-login" style={{ color:'#f87171', textDecoration:'none', fontWeight:600, cursor:'pointer' }}>
+            Aller ici
+          </a>
+        </p>
 
         {/* Divider */}
         <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:24, paddingTop:18, borderTop:'1px solid rgba(248,113,113,.08)' }}>

@@ -220,7 +220,8 @@ export default function AdminDashboard() {
     if (!user) { navigate('/secure-access'); return; }
     try {
       const u = JSON.parse(user);
-      if (u.role !== 'admin') navigate('/client/dashboard');
+      const isAdminUser = (role) => String(role || '').toLowerCase().includes('administrateur');
+      if (!isAdminUser(u.role)) navigate('/');
     } catch { navigate('/secure-access'); }
 
     const fetchData = async () => {
@@ -304,7 +305,7 @@ export default function AdminDashboard() {
             <button className={`adm-nav-btn ${activeTab==='reports'?'active':''}`}    onClick={()=>setSearchParams({tab:'reports'})}>Rapports reçus</button>
             <button className={`adm-nav-btn ${activeTab==='analytics'?'active':''}`} onClick={()=>setSearchParams({tab:'analytics'})}>Analyses Nationales</button>
             <button className={`adm-nav-btn ${activeTab==='users'?'active':''}`}      onClick={()=>setSearchParams({tab:'users'})}>Gestion utilisateurs</button>
-          </div>
+</div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:20 }}>
           <div style={{ textAlign:'right', lineHeight:1.2 }}>

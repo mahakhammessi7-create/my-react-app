@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage      from './pages/LoginPage';
 import RegisterPage   from './pages/RegisterPage';
 import AdminLoginPage from './pages/AdminloginPage';
+import ChargeEtudeLoginPage from './pages/ChargeEtudeLoginPage';
 import AuditForm from './components/Module1_Conformity/AuditForm';
 import AdminDashboard  from './pages/admin/AdminDashboard';
 // ✅ Add these 4 imports (adjust paths to match where you saved the files)
@@ -12,6 +13,7 @@ import GuidePage         from './pages/client/GuidePage';
 import ContactPage       from './pages/client/ContactPage';
 import UserManagement from './pages/admin/UserManagement';
 import TechnicalReviewInterface from './components/Module3_TechnicalReview/TechnicalReviewInterface';
+import ChargeEtudeDashboard from './pages/charge-etude/ChargeEtudeDashboard';
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
         <Route path="/register"       element={<RegisterPage />}    />
         {/* ── Admin login caché — URL secrète, non linkée ── */}
         <Route path="/secure-access"  element={<AdminLoginPage />}  />
+        {/* ── Charge d'Étude login ── */}
+        <Route path="/charge-etude-login"  element={<ChargeEtudeLoginPage />}  />
         {/* ── Dashboards ── */}
         <Route path="/client/dashboard" element={<AuditForm />} />
         <Route path="/admin/dashboard"  element={<AdminDashboard />}  />
@@ -33,6 +37,8 @@ function App() {
         <Route path="/client/notifications"  element={<NotificationsPage />} />
         <Route path="/client/guide"          element={<GuidePage />}         />
         <Route path="/client/contact"        element={<ContactPage />}       />
+        {/* ── Charge d'Étude Dashboard ── */}
+        <Route path="/charge-etude/dashboard"  element={<ChargeEtudeDashboard />} />
         {/* ── Technical Review Interface ── */}
         <Route path="/technical-review"      element={<TechnicalReviewInterface />} />
         {/* ── Fallback ── */}

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'https://pfe-backend-9eec.onrender.com',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
   timeout: 15000,
 });
 
@@ -21,11 +21,19 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const currentPath = window.location.pathname;
+   if (status === 401 && currentPath !== '/charge-etude/login' && currentPath !== '/') {
+      localStorage.clear(); // Cleaner than removing items one by one
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('extractedData');
-      window.location.href = '/';
+      if (currentPath.includes('charge-etude')) {
+        window.location.href = '/charge-etude/login';
+      } else {
+        window.location.href = '/';
+      }
+    
     }
     return Promise.reject(error);
   }

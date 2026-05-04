@@ -126,6 +126,9 @@ export default function LoginPage() {
   const [error,    setError]    = useState('');
   const [fieldErr, setFieldErr] = useState({ email:false, password:false });
 
+  const isAdminUser = (role) => String(role || '').toLowerCase().includes('administrateur');
+  const isChargeEtude = (role) => String(role || '').toLowerCase().includes('charge d\'étude');
+
   useEffect(() => {
     injectLpStyles();
     // Redirection si déjà connecté
@@ -133,7 +136,13 @@ export default function LoginPage() {
     if (user) {
       try {
         const u = JSON.parse(user);
-        navigate(u.role === 'admin' ? '/admin/dashboard' : '/client/dashboard');
+        if (isAdminUser(u.role)) {
+          navigate('/admin/dashboard');
+        } else if (isChargeEtude(u.role)) {
+          navigate('/charge-etude/dashboard');
+        } else {
+          navigate('/client/dashboard');
+        }
       } catch { localStorage.clear(); }
     }
     return () => document.getElementById('lp-styles')?.remove();
@@ -249,6 +258,14 @@ export default function LoginPage() {
         <p style={{ textAlign:'center', marginTop:20, fontSize:13, color:'#3d607a' }}>
           Pas encore de compte ?{' '}
           <span className="lp-link" onClick={() => navigate('/register')}>Inscrivez-vous</span>
+        </p>
+
+        {/* Charge d'Étude Link */}
+        <p style={{ textAlign:'center', marginTop:16, fontSize:12, color:'#3d607a' }}>
+          Accès Charge d'Étude ? {' '}
+          <span className="lp-link" onClick={() => navigate('/charge-etude-login')} style={{ cursor:'pointer' }}>
+            Aller ici
+          </span>
         </p>
 
         <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:22, paddingTop:16, borderTop:'1px solid rgba(255,255,255,.05)' }}>

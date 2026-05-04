@@ -91,7 +91,7 @@ function AnimCount({ to, suffix = '', duration = 1000 }) {
       if (p < 1) requestAnimationFrame(run);
     };
     requestAnimationFrame(run);
-  }, [to]);
+  }, [to, duration]);
   return <>{v}{suffix}</>;
 }
 
@@ -103,7 +103,7 @@ function ProgressBar({ value, color, delay = 0 }) {
   useEffect(() => {
     const t = setTimeout(() => setW(Math.min(value, 100)), 300 + delay);
     return () => clearTimeout(t);
-  }, [value]);
+  }, [value, delay]);
   return (
     <div style={{ height:6, background:'rgba(255,255,255,.05)', borderRadius:99, overflow:'hidden' }}>
       <div style={{
@@ -190,7 +190,6 @@ export default function NationalDashboard() {
   const cx   = stats.complexIndicators || {};
 
   const total     = +g.total_reports   || 0;
-  const avg       = +g.avg_score       || 0;
   const pending   = +g.pending_count   || 0;
   const withRssi  = +g.with_rssi       || 0;
   const withPssi  = +g.with_pssi       || 0;
