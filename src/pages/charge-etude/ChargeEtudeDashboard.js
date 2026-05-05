@@ -315,7 +315,26 @@ export default function ChargeEtudeDashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [notification, setNotification] = useState(null);
   const navigate = useNavigate();
+
+  // Callback pour les nouvelles assignations
+  const handleNewAssignment = (report) => {
+    setNotification({
+      reportId: report.id,
+      company: report.organism_name || report.company_name || 'Nouveau rapport',
+      priority: report.priority || 'Normale'
+    });
+    
+    // Jouer un son de notification
+    try {
+      const audio = new Audio('data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA==');
+      audio.play().catch(() => {});
+    } catch (e) {}
+    
+    // Masquer la notification après 5 secondes
+    setTimeout(() => setNotification(null), 5000);
+  };
 
   // Hook pour les rapports assignés à ce chargé d'étude
   const { 
@@ -324,7 +343,7 @@ export default function ChargeEtudeDashboard() {
     validateReport: validateReportHook,
     rejectReport: rejectReportHook,
     refetch 
-  } = useMyAssignedReports(user?.id);
+  } = useMyAssignedReports(user?.id, handleNewAssignment);
 
   // Hook pour les rapports en temps réel
   const { reports: realtimeReports, loading: realtimeLoading } = useReportsRealtime("assigné");
@@ -430,6 +449,52 @@ export default function ChargeEtudeDashboard() {
       {toast && (
         <div className={`ce-toast ${toast.isError ? 'error' : ''}`}>
           {toast.message}
+        </div>
+      )}
+
+      {/* Notification Popup for New Assignment */}
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+          color: 'white',
+          padding: '20px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 10px 40px rgba(139, 92, 246, 0.3)',
+          zIndex: 2000,
+          animation: 'slideDown 0.4s ease',
+          maxWidth: '400px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ fontSize: '24px', marginTop: '2px' }}>🔔</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>
+                Nouveau rapport assigné !
+              </div>
+              <div style={{ fontSize: '13px', opacity: 0.9, marginBottom: '8px' }}>
+                {notification.company}
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                Priorité: <strong>{notification.priority}</strong>
+              </div>
+            </div>
+          </div>
+          <style>{`
+            @keyframes slideDown {
+              from {
+                transform: translateY(-100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateY(0);
+                opacity: 1;
+              }
+            }
+          `}</style>
         </div>
       )}
 

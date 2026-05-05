@@ -48,6 +48,7 @@ function Modal({ user, onClose, onSave }) {
             <label className="form-label">Rôle</label>
             <select className="form-input" value={form.role} onChange={e=>set("role",e.target.value)}>
               <option value="client">Client</option>
+              <option value="charge-etude">Chargé d'étude</option>
               <option value="responsable">Responsable de suivi</option>
               <option value="admin">Admin</option>
             </select>
@@ -177,6 +178,7 @@ export default function UserManagement() {
     {label:"COMPTES ACTIFS",        value:users.filter(u=>u.status==="active").length,   accent:"#4ade80"},
     {label:"ADMINISTRATEURS",       value:users.filter(u=>u.role==="admin").length,      accent:"#fbbf24"},
     {label:"RESPONSABLES",          value:users.filter(u=>u.role==="responsable").length, accent:"#10b981"},
+    {label:"CHARGÉS D'ÉTUDE",       value:users.filter(u=>u.role==="charge-etude").length, accent:"#8b5cf6"},
     {label:"COMPTES INACTIFS",      value:users.filter(u=>u.status==="inactive").length, accent:"#f87171"},
   ];
 
@@ -223,6 +225,7 @@ export default function UserManagement() {
               <option value="all">Tous les rôles</option>
               <option value="admin">Admin</option>
               <option value="responsable">Responsable</option>
+              <option value="charge-etude">Chargé d'étude</option>
               <option value="client">Client</option>
             </select>
             <select className="filter-select" value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
@@ -258,7 +261,7 @@ export default function UserManagement() {
                   </td>
                   <td className="cell-muted">{u.organism}</td>
                   <td className="cell-muted">{u.sector}</td>
-                  <td><span className={`badge role-${u.role}`}>{u.role==="admin"?"Admin":u.role==="responsable"?"Responsable":"Client"}</span></td>
+                  <td><span className={`badge role-${u.role}`}>{u.role==="admin"?"Admin":u.role==="responsable"?"Responsable":u.role==="charge-etude"?"Chargé d'étude":"Client"}</span></td>
                   <td><span className={`badge status-${u.status}`}><span className="dot"/>{u.status==="active"?"Actif":u.status==="inactive"?"Inactif":"Suspendu"}</span></td>
                   <td className="cell-date">{u.lastLogin}</td>
                   <td>
@@ -298,7 +301,7 @@ const CSS = `
 @keyframes spin{to{transform:rotate(360deg)}}
 .btn-add{background:transparent;border:1px solid #22d3ee;color:#22d3ee;padding:10px 22px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:'Inter',sans-serif;white-space:nowrap;}
 .btn-add:hover{background:#22d3ee;color:#0d1117;}
-.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:28px;}
 .kpi-card{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:22px 24px 16px;}
 .kpi-label{font-size:11px;letter-spacing:.1em;color:#8b949e;font-family:'Rajdhani',sans-serif;font-weight:600;margin:0 0 10px;text-transform:uppercase;}
 .kpi-value{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:44px;margin:0 0 16px;line-height:1;}
@@ -328,6 +331,7 @@ const CSS = `
 .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.04em;font-family:'Rajdhani',sans-serif;}
 .role-admin{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.25);}
 .role-responsable{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2);}
+.role-charge-etude{background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2);}
 .role-client{background:rgba(34,211,238,.08);color:#22d3ee;border:1px solid rgba(34,211,238,.2);}
 .status-active{background:rgba(74,222,128,.08);color:#4ade80;border:1px solid rgba(74,222,128,.2);}
 .status-inactive{background:rgba(139,148,158,.08);color:#8b949e;border:1px solid rgba(139,148,158,.2);}

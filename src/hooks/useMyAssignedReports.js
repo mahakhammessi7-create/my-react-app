@@ -9,7 +9,7 @@ import supabase from '../lib/supabaseClient';
  * useMyAssignedReports
  * @param {number} currentUserId - l'ID du chargé d'étude connecté
  */
-export function useMyAssignedReports(currentUserId) {
+export function useMyAssignedReports(currentUserId, onNewAssignment) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -66,6 +66,9 @@ export function useMyAssignedReports(currentUserId) {
             if (data) {
               setReports((prev) => {
                 const exists = prev.some((r) => r.id === data.id);
+                if (!exists && onNewAssignment) {
+                  onNewAssignment(data);
+                }
                 if (exists) return prev.map((r) => (r.id === data.id ? data : r));
                 return [data, ...prev];
               });
