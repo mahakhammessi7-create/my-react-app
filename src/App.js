@@ -15,6 +15,7 @@ import ContactPage       from './pages/client/ContactPage';
 import UserManagement from './pages/admin/UserManagement';
 import TechnicalReviewInterface from './components/Module3_TechnicalReview/TechnicalReviewInterface';
 import ChargeEtudeDashboard from './pages/charge-etude/ChargeEtudeDashboard';
+import ChargeEtudeProfile from './pages/charge-etude/ChargeEtudeProfile';
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
         <Route path="/client/contact"        element={<ContactPage />}       />
         {/* ── Charge d'Étude Dashboard ── */}
         <Route path="/charge-etude/dashboard"  element={<ChargeEtudeDashboard />} />
+        <Route path="/charge-etude/profile"    element={<ChargeEtudeProfile />} />
         {/* ── Technical Review Interface ── */}
         <Route path="/technical-review"      element={<TechnicalReviewInterface />} />
         {/* ── Fallback ── */}
