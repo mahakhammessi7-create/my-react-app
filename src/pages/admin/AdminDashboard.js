@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import API from '../../services/api';
-import NationalDashboard from '../../components/Module3_Analytics/NationalDashboard';
 import UserManagement from './UserManagement';
-
 
 /* ══════════════════════════════════════════════
    STYLES
@@ -15,16 +13,10 @@ const CSS = `
   @keyframes adm-spin { to{transform:rotate(360deg)} }
   @keyframes adm-glow { 0%,100%{opacity:.25} 50%{opacity:.65} }
   @keyframes adm-scan { 0%{top:0;opacity:.6} 100%{top:100%;opacity:0} }
-  @keyframes adm-rotateSlow { from{transform:rotate(0)} to{transform:rotate(360deg)} }
 
   .adm-root * { box-sizing:border-box; margin:0; padding:0; }
   .adm-root   { font-family:'DM Sans',sans-serif; }
   .adm-anim   { animation:adm-up .5s ease both; }
-  .adm-anim:nth-child(1){animation-delay:.04s}
-  .adm-anim:nth-child(2){animation-delay:.09s}
-  .adm-anim:nth-child(3){animation-delay:.14s}
-  .adm-anim:nth-child(4){animation-delay:.19s}
-  .adm-anim:nth-child(5){animation-delay:.24s}
 
   .adm-nav-btn {
     display:flex; align-items:center; gap:7px;
@@ -105,7 +97,6 @@ function injectStyles() {
    THEME
 ══════════════════════════════════════════════ */
 const RED    = '#f87171';
-const TEAL   = '#63d2be';
 const GREEN  = '#4ade80';
 const AMBER  = '#fbbf24';
 const BLUE   = '#38bdf8';
@@ -142,7 +133,7 @@ function SectionHeader({ icon, title, iconBg = RED }) {
 /* ══════════════════════════════════════════════
    MODAL DÉTAIL RAPPORT
 ══════════════════════════════════════════════ */
-function ReportModal({ report, onClose, onStatusChange, navigate }) {
+function ReportModal({ report, onClose, onStatusChange }) {
   if (!report) return null;
   const scoreColor = report.compliance_score >= 75 ? GREEN : report.compliance_score >= 55 ? AMBER : RED;
 
@@ -155,8 +146,8 @@ function ReportModal({ report, onClose, onStatusChange, navigate }) {
     <div className="adm-modal-bg" onClick={onClose}>
       <div style={{ background:'#0c1e34', border:'1px solid rgba(255,255,255,.08)', borderRadius:22, width:'100%', maxWidth:500, boxShadow:'0 32px 80px rgba(0,0,0,.7)', overflow:'hidden' }}
         onClick={e => e.stopPropagation()}>
-        <div style={{ background:'linear-gradient(135deg,#0c1f3a,#0a2540)', padding:'22px 24px', position:'relative', overflow:'hidden' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', position:'relative' }}>
+        <div style={{ background:'linear-gradient(135deg,#0c1f3a,#0a2540)', padding:'22px 24px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
             <div>
               <div style={{ fontFamily:"'Syne',sans-serif", fontSize:16, fontWeight:800, color:'#e4f2ff', marginBottom:6 }}>{report.company_name}</div>
               <div style={{ display:'flex', gap:10, alignItems:'center' }}>
@@ -266,22 +257,17 @@ export default function AdminDashboard() {
     try {
       await API.patch(`/reports/${id}/status`, { status });
       setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-    } catch (err) {
+    } catch {
       alert('Erreur lors de la mise à jour du statut');
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/secure-access');
-  };
+  const handleLogout = () => { localStorage.clear(); navigate('/secure-access'); };
 
   const filtered = reports.filter(r => {
     const name   = (r.company_name || r.organism_name || '').toLowerCase();
     const sector = r.sector || r.organism_sector || '';
-    const mQuery  = name.includes(query.toLowerCase());
-    const mSector = filterSec === 'All' || sector === filterSec;
-    return mQuery && mSector;
+    return name.includes(query.toLowerCase()) && (filterSec === 'All' || sector === filterSec);
   });
 
   const sectors = ['All', ...new Set(reports.map(r => r.sector || r.organism_sector).filter(Boolean))];
@@ -302,13 +288,12 @@ export default function AdminDashboard() {
             <div style={{ width:36, height:36, background:'linear-gradient(135deg,#f87171,#991b1b)', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, boxShadow:'0 8px 16px rgba(248,113,113,.2)' }}>🛡️</div>
             <div style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:17, letterSpacing:'-.5px' }}>ANCS <span style={{ color:RED }}>Admin</span></div>
           </div>
+          {/* ── 3 tabs only — Analyses Nationales moved to Décideur ── */}
           <div style={{ display:'flex', gap:6 }}>
-            {/* ✅ All tabs use setSearchParams — nav never disappears */}
-            <button className={`adm-nav-btn ${activeTab==='overview'?'active':''}`}   onClick={()=>setSearchParams({tab:'overview'})}>Vue d'ensemble</button>
-            <button className={`adm-nav-btn ${activeTab==='reports'?'active':''}`}    onClick={()=>setSearchParams({tab:'reports'})}>Rapports reçus</button>
-            <button className={`adm-nav-btn ${activeTab==='analytics'?'active':''}`} onClick={()=>setSearchParams({tab:'analytics'})}>Analyses Nationales</button>
-            <button className={`adm-nav-btn ${activeTab==='users'?'active':''}`}      onClick={()=>setSearchParams({tab:'users'})}>Gestion utilisateurs</button>
-</div>
+            <button className={`adm-nav-btn ${activeTab==='overview'?'active':''}`} onClick={()=>setSearchParams({tab:'overview'})}>Vue d'ensemble</button>
+            <button className={`adm-nav-btn ${activeTab==='reports'?'active':''}`}  onClick={()=>setSearchParams({tab:'reports'})}>Rapports reçus</button>
+            <button className={`adm-nav-btn ${activeTab==='users'?'active':''}`}    onClick={()=>setSearchParams({tab:'users'})}>Gestion utilisateurs</button>
+          </div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:20 }}>
           <div style={{ textAlign:'right', lineHeight:1.2 }}>
@@ -322,20 +307,17 @@ export default function AdminDashboard() {
       {/* ── CONTENT ── */}
       <main style={{ padding:32, maxWidth:1400, margin:'0 auto' }}>
 
-        {/* Error banner */}
         {error && (
           <div style={{ background:'rgba(248,113,113,.08)', border:'1px solid rgba(248,113,113,.2)', borderRadius:14, padding:'12px 20px', marginBottom:24, color:RED, fontSize:13 }}>
             ⚠️ {error}
           </div>
         )}
 
-        {/* ✅ Users tab — renders UserManagement component inline */}
+        {/* ── USERS ── */}
         {activeTab === 'users' ? (
           <UserManagement />
 
-        ) : activeTab === 'analytics' ? (
-          <NationalDashboard />
-
+        /* ── REPORTS ── */
         ) : activeTab === 'reports' ? (
           <div className="adm-anim">
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:24 }}>
@@ -398,8 +380,8 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+        /* ── VUE D'ENSEMBLE ── */
         ) : (
-          /* ── VUE D'ENSEMBLE ── */
           <div className="adm-anim">
             <div style={{ marginBottom:32 }}>
               <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:28, fontWeight:800, marginBottom:8 }}>Dashboard <span style={{ color:RED }}>Overview</span></h1>
@@ -468,8 +450,7 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {selected && <ReportModal report={selected} onClose={()=>setSelected(null)} onStatusChange={updateStatus} navigate={navigate} />}
+      {selected && <ReportModal report={selected} onClose={()=>setSelected(null)} onStatusChange={updateStatus} />}
     </div>
   );
 }
-

@@ -13,7 +13,6 @@ const CSS = `
   @keyframes rp-glow  { 0%,100%{opacity:.25} 50%{opacity:.7} }
   @keyframes rp-scan  { 0%{top:0;opacity:.6} 100%{top:100%;opacity:0} }
   @keyframes rp-shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
-  @keyframes rp-rotateSlow { from{transform:rotate(0)} to{transform:rotate(360deg)} }
   @keyframes rp-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
 
   * { box-sizing:border-box; margin:0; padding:0; }
@@ -50,17 +49,6 @@ const CSS = `
     animation:rp-scan 3.5s linear infinite; pointer-events:none;
   }
 
-  .rp-tab {
-    flex:1; padding:10px 8px;
-    background:transparent; border:none; border-radius:10px;
-    font-size:12px; font-family:'DM Sans',sans-serif; font-weight:500;
-    cursor:pointer; transition:all .2s; color:#3d607a;
-    display:flex; align-items:center; justify-content:center; gap:6px;
-  }
-  .rp-tab.client.active  { background:rgba(99,210,190,.1);  color:#63d2be; font-weight:700; box-shadow:inset 0 0 0 1px rgba(99,210,190,.2); }
-  .rp-tab.admin.active   { background:rgba(248,113,113,.1); color:#f87171; font-weight:700; box-shadow:inset 0 0 0 1px rgba(248,113,113,.2); }
-  .rp-tab:hover:not(.active) { color:#8ab0c8; background:rgba(255,255,255,.04); }
-
   .rp-label {
     display:block; font-size:11px; font-weight:600;
     color:#3d607a; text-transform:uppercase; letter-spacing:.5px; margin-bottom:7px;
@@ -81,11 +69,6 @@ const CSS = `
     background:rgba(99,210,190,.04);
     box-shadow:0 0 0 3px rgba(99,210,190,.07);
   }
-  .rp-input.admin-focus:focus {
-    border-color:rgba(248,113,113,.4);
-    background:rgba(248,113,113,.03);
-    box-shadow:0 0 0 3px rgba(248,113,113,.06);
-  }
   .rp-input.err {
     border-color:rgba(248,113,113,.4);
     background:rgba(248,113,113,.04);
@@ -101,7 +84,7 @@ const CSS = `
   }
   .rp-eye:hover { color:#63d2be; }
 
-  .rp-submit-client {
+  .rp-submit {
     width:100%; padding:14px; margin-top:6px;
     background:linear-gradient(135deg,#63d2be,#2eb8a0);
     color:#071520; border:none; border-radius:12px;
@@ -110,27 +93,11 @@ const CSS = `
     display:flex; align-items:center; justify-content:center; gap:9px;
     transition:filter .2s, transform .15s, box-shadow .2s;
   }
-  .rp-submit-client:hover:not(:disabled) {
+  .rp-submit:hover:not(:disabled) {
     filter:brightness(1.1); transform:translateY(-2px);
     box-shadow:0 12px 32px rgba(99,210,190,.22);
   }
-
-  .rp-submit-admin {
-    width:100%; padding:14px; margin-top:6px;
-    background:linear-gradient(135deg,#f87171,#dc2626);
-    color:#fff; border:none; border-radius:12px;
-    font-size:15px; font-family:'DM Sans',sans-serif; font-weight:700;
-    cursor:pointer; letter-spacing:.3px;
-    display:flex; align-items:center; justify-content:center; gap:9px;
-    transition:filter .2s, transform .15s, box-shadow .2s;
-  }
-  .rp-submit-admin:hover:not(:disabled) {
-    filter:brightness(1.1); transform:translateY(-2px);
-    box-shadow:0 12px 32px rgba(248,113,113,.25);
-  }
-
-  .rp-submit-client:disabled,
-  .rp-submit-admin:disabled {
+  .rp-submit:disabled {
     background:rgba(255,255,255,.07); color:#2a4a62; cursor:not-allowed; transform:none;
   }
 
@@ -185,25 +152,17 @@ const SECTORS = ['Finance / Banque','Santé','Administration publique','Énergie
 export default function RegisterPage() {
   const navigate = useNavigate();
 
-  const [mode,         setMode]         = useState('client'); // client | admin
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
   const [success,      setSuccess]      = useState('');
   const [showPwd,      setShowPwd]      = useState(false);
-  const [showKey,      setShowKey]      = useState(false);
 
-  // Client fields
+  // Client fields only
   const [username,     setUsername]     = useState('');
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
   const [companyName,  setCompanyName]  = useState('');
   const [sector,       setSector]       = useState('');
-
-  // Admin fields
-  const [adminUser,    setAdminUser]    = useState('');
-  const [adminEmail,   setAdminEmail]   = useState('');
-  const [adminPwd,     setAdminPwd]     = useState('');
-  const [secretKey,    setSecretKey]    = useState('');
 
   useEffect(() => {
     injectRpStyles();
@@ -213,7 +172,7 @@ export default function RegisterPage() {
   const reset = () => { setError(''); setSuccess(''); };
 
   /* ── Client submit ── */
-  const handleClientRegister = async () => {
+  const handleRegister = async () => {
     reset();
     if (!username || !email || !password || !companyName || !sector) {
       return setError('Veuillez remplir tous les champs obligatoires.');
@@ -235,37 +194,7 @@ export default function RegisterPage() {
     }
   };
 
-  /* ── Admin submit ── */
-  const handleAdminRegister = async () => {
-    reset();
-    if (!adminUser || !adminEmail || !adminPwd || !secretKey) {
-      return setError('Veuillez remplir tous les champs.');
-    }
-    if (!adminEmail.includes('@')) return setError('Adresse email invalide.');
-    if (adminPwd.length < 8)       return setError('Le mot de passe admin doit contenir au moins 8 caractères.');
-
-    setLoading(true);
-    try {
-      await API.post('/auth/register-admin', {
-        username:       adminUser,
-        email:          adminEmail,
-        password:       adminPwd,
-        adminSecretKey: secretKey,
-      });
-      setSuccess("Compte administrateur créé ! Redirection vers la connexion...");
-      setTimeout(() => navigate('/'), 2500);
-    } catch (err) {
-      const status = err.response?.status;
-      const msg    = err.response?.data?.error;
-      if (!err.response) setError("Impossible de joindre le serveur.");
-      else if (status === 403) setError("Clé administrateur incorrecte.");
-      else setError(msg || "Erreur lors de la création du compte admin.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onKey = (e) => { if (e.key === 'Enter') mode === 'client' ? handleClientRegister() : handleAdminRegister(); };
+  const onKey = (e) => { if (e.key === 'Enter') handleRegister(); };
 
   /* ══════════════════════════════════════════════
      RENDER
@@ -290,20 +219,9 @@ export default function RegisterPage() {
             🏛️
           </div>
           <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:20, fontWeight:800, color:'#e4f2ff', marginBottom:4, letterSpacing:'-.2px' }}>
-            Créer un compte
+            Créer un compte entreprise
           </h1>
           <p style={{ fontSize:12, color:'#3d607a' }}>Plateforme ANCS · Audit des Systèmes d'Information</p>
-        </div>
-
-        {/* Mode tabs */}
-        <div style={{ display:'flex', gap:5, background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.06)', borderRadius:13, padding:4, marginBottom:22 }}
-          onClick={reset}>
-          <button className={`rp-tab client${mode==='client'?' active':''}`} onClick={() => setMode('client')}>
-            🏢 Entreprise
-          </button>
-          <button className={`rp-tab admin${mode==='admin'?' active':''}`} onClick={() => setMode('admin')}>
-            🛡️ Administrateur
-          </button>
         </div>
 
         {/* Success */}
@@ -323,122 +241,63 @@ export default function RegisterPage() {
         )}
 
         {/* ══ CLIENT FORM ══ */}
-        {mode === 'client' && (
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:2 }}>
-              {/* Username */}
-              <div>
-                <label className="rp-label">Nom d'utilisateur *</label>
-                <div className="rp-input-wrap" style={{ marginBottom:0 }}>
-                  <span className="rp-icon">👤</span>
-                  <input className="rp-input" placeholder="votre_nom" value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={onKey} disabled={loading} />
-                </div>
-              </div>
-              {/* Email */}
-              <div>
-                <label className="rp-label">Email professionnel *</label>
-                <div className="rp-input-wrap" style={{ marginBottom:0 }}>
-                  <span className="rp-icon">✉️</span>
-                  <input className="rp-input" type="email" placeholder="contact@entreprise.tn" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={onKey} disabled={loading} />
-                </div>
-              </div>
-            </div>
-
-            {/* Company */}
-            <div style={{ marginTop:12 }}>
-              <label className="rp-label">Nom de l'entreprise *</label>
-              <div className="rp-input-wrap">
-                <span className="rp-icon">🏢</span>
-                <input className="rp-input" placeholder="Société Nationale de..." value={companyName} onChange={e=>setCompanyName(e.target.value)} onKeyDown={onKey} disabled={loading} />
-              </div>
-            </div>
-
-            {/* Sector */}
-            <div>
-              <label className="rp-label">Secteur d'activité *</label>
-              <div className="rp-input-wrap">
-                <span className="rp-icon">🏭</span>
-                <select className="rp-select" value={sector} onChange={e=>setSector(e.target.value)} disabled={loading}>
-                  <option value="">Sélectionnez un secteur</option>
-                  {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="rp-label">Mot de passe *</label>
-              <div className="rp-input-wrap">
-                <span className="rp-icon">🔑</span>
-                <input className="rp-input" type={showPwd?'text':'password'} placeholder="Minimum 6 caractères" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={onKey} disabled={loading} style={{ paddingRight:40 }} />
-                <button className="rp-eye" onClick={()=>setShowPwd(v=>!v)} tabIndex={-1}>{showPwd?'🙈':'👁️'}</button>
-              </div>
-            </div>
-
-            <button className="rp-submit-client" onClick={handleClientRegister} disabled={loading}>
-              {loading
-                ? <><span style={{ width:16, height:16, border:'2px solid rgba(7,17,30,.2)', borderTop:'2px solid #07111e', borderRadius:'50%', animation:'rp-spin 1s linear infinite', flexShrink:0 }} />Création en cours...</>
-                : <>🏢 Créer le compte entreprise</>}
-            </button>
-          </div>
-        )}
-
-        {/* ══ ADMIN FORM ══ */}
-        {mode === 'admin' && (
-          <div>
-            {/* Info banner */}
-            <div style={{ display:'flex', gap:10, background:'rgba(248,113,113,.07)', border:'1px solid rgba(248,113,113,.15)', borderRadius:12, padding:'12px 16px', marginBottom:18, alignItems:'flex-start' }}>
-              <span style={{ fontSize:16, flexShrink:0 }}>🛡️</span>
-              <div style={{ fontSize:12, color:'#fca5a5', lineHeight:1.6 }}>
-                La création d'un compte administrateur nécessite une <strong>clé secrète</strong> délivrée par le super-administrateur ANCS.
-              </div>
-            </div>
-
-            {/* Admin username */}
+        <div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:2 }}>
+            {/* Username */}
             <div>
               <label className="rp-label">Nom d'utilisateur *</label>
-              <div className="rp-input-wrap">
+              <div className="rp-input-wrap" style={{ marginBottom:0 }}>
                 <span className="rp-icon">👤</span>
-                <input className="rp-input admin-focus" placeholder="admin_prenom" value={adminUser} onChange={e=>setAdminUser(e.target.value)} onKeyDown={onKey} disabled={loading} />
+                <input className="rp-input" placeholder="votre_nom" value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={onKey} disabled={loading} />
               </div>
             </div>
-
-            {/* Admin email */}
+            {/* Email */}
             <div>
-              <label className="rp-label">Email *</label>
-              <div className="rp-input-wrap">
+              <label className="rp-label">Email professionnel *</label>
+              <div className="rp-input-wrap" style={{ marginBottom:0 }}>
                 <span className="rp-icon">✉️</span>
-                <input className="rp-input admin-focus" type="email" placeholder="admin@ancs.tn" value={adminEmail} onChange={e=>setAdminEmail(e.target.value)} onKeyDown={onKey} disabled={loading} />
+                <input className="rp-input" type="email" placeholder="contact@entreprise.tn" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={onKey} disabled={loading} />
               </div>
             </div>
-
-            {/* Admin password */}
-            <div>
-              <label className="rp-label">Mot de passe * <span style={{ color:'#3d607a', fontWeight:400, textTransform:'none', letterSpacing:0 }}>(min. 8 caractères)</span></label>
-              <div className="rp-input-wrap">
-                <span className="rp-icon">🔑</span>
-                <input className="rp-input admin-focus" type={showPwd?'text':'password'} placeholder="Minimum 8 caractères" value={adminPwd} onChange={e=>setAdminPwd(e.target.value)} onKeyDown={onKey} disabled={loading} style={{ paddingRight:40 }} />
-                <button className="rp-eye" onClick={()=>setShowPwd(v=>!v)} tabIndex={-1}>{showPwd?'🙈':'👁️'}</button>
-              </div>
-            </div>
-
-            {/* Secret key */}
-            <div>
-              <label className="rp-label" style={{ color:'#f87171' }}>🔐 Clé secrète administrateur *</label>
-              <div className="rp-input-wrap">
-                <span className="rp-icon">🗝️</span>
-                <input className="rp-input admin-focus" type={showKey?'text':'password'} placeholder="Clé fournie par l'ANCS" value={secretKey} onChange={e=>setSecretKey(e.target.value)} onKeyDown={onKey} disabled={loading} style={{ paddingRight:40 }} />
-                <button className="rp-eye" onClick={()=>setShowKey(v=>!v)} tabIndex={-1}>{showKey?'🙈':'👁️'}</button>
-              </div>
-            </div>
-
-            <button className="rp-submit-admin" onClick={handleAdminRegister} disabled={loading}>
-              {loading
-                ? <><span style={{ width:16, height:16, border:'2px solid rgba(255,255,255,.25)', borderTop:'2px solid white', borderRadius:'50%', animation:'rp-spin 1s linear infinite', flexShrink:0 }} />Création en cours...</>
-                : <>🛡️ Créer le compte administrateur</>}
-            </button>
           </div>
-        )}
+
+          {/* Company */}
+          <div style={{ marginTop:12 }}>
+            <label className="rp-label">Nom de l'entreprise *</label>
+            <div className="rp-input-wrap">
+              <span className="rp-icon">🏢</span>
+              <input className="rp-input" placeholder="Société Nationale de..." value={companyName} onChange={e=>setCompanyName(e.target.value)} onKeyDown={onKey} disabled={loading} />
+            </div>
+          </div>
+
+          {/* Sector */}
+          <div>
+            <label className="rp-label">Secteur d'activité *</label>
+            <div className="rp-input-wrap">
+              <span className="rp-icon">🏭</span>
+              <select className="rp-select" value={sector} onChange={e=>setSector(e.target.value)} disabled={loading}>
+                <option value="">Sélectionnez un secteur</option>
+                {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="rp-label">Mot de passe *</label>
+            <div className="rp-input-wrap">
+              <span className="rp-icon">🔑</span>
+              <input className="rp-input" type={showPwd?'text':'password'} placeholder="Minimum 6 caractères" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={onKey} disabled={loading} style={{ paddingRight:40 }} />
+              <button className="rp-eye" onClick={()=>setShowPwd(v=>!v)} tabIndex={-1}>{showPwd?'🙈':'👁️'}</button>
+            </div>
+          </div>
+
+          <button className="rp-submit" onClick={handleRegister} disabled={loading}>
+            {loading
+              ? <><span style={{ width:16, height:16, border:'2px solid rgba(7,17,30,.2)', borderTop:'2px solid #07111e', borderRadius:'50%', animation:'rp-spin 1s linear infinite', flexShrink:0 }} />Création en cours...</>
+              : <>🏢 Créer le compte entreprise</>}
+          </button>
+        </div>
 
         {/* Back to login */}
         <p style={{ textAlign:'center', marginTop:22, fontSize:13, color:'#3d607a' }}>

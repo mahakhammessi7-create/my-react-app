@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
@@ -23,7 +22,6 @@ const CSS = `
     display:flex; align-items:center; justify-content:center;
     position:relative; overflow:hidden; animation:al-fadeIn .4s ease;
   }
-  /* Dark red grid */
   .al-root::before {
     content:''; position:absolute; inset:0;
     background-image:
@@ -97,6 +95,36 @@ const CSS = `
     border-radius:12px; padding:12px 14px; margin-bottom:16px;
     animation:al-shake .4s ease;
   }
+
+  .al-links {
+    margin-top:20px;
+    padding-top:18px;
+    border-top:1px solid rgba(248,113,113,.08);
+    text-align:center;
+  }
+
+  .al-link {
+    display:block;
+    color:#f87171;
+    text-decoration:none;
+    font-size:12px;
+    font-weight:600;
+    margin:8px 0;
+    transition:all .2s;
+  }
+
+  .al-link:hover {
+    color:#fca5a5;
+    text-decoration:underline;
+  }
+
+  .al-footer {
+    display:flex; align-items:center; gap:10px;
+    margin-top:20px; padding-top:16px;
+    border-top:1px solid rgba(248,113,113,.08);
+  }
+  .al-footer-line { flex:1; height:1px; background:rgba(248,113,113,.06); }
+  .al-footer-text { font-size:10px; color:#3d1a1a; letter-spacing:.5px; text-transform:uppercase; font-weight:600; }
 `;
 
 function injectAlStyles() {
@@ -120,7 +148,6 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     injectAlStyles();
-    // Si déjà connecté en admin → redirect direct
     const user = localStorage.getItem('user');
     if (user) {
       try {
@@ -155,7 +182,7 @@ export default function AdminLoginPage() {
 
       localStorage.setItem('token', token);
       localStorage.setItem('user',  JSON.stringify(user));
-      localStorage.removeItem('extractedData'); // ✅ nettoyage session
+      localStorage.removeItem('extractedData');
       navigate('/admin/dashboard');
     } catch (err) {
       const status = err.response?.status;
@@ -170,13 +197,10 @@ export default function AdminLoginPage() {
 
   return (
     <div className="al-root">
-
-      {/* Red glow orbs */}
       {[['15%','10%','#f87171'],['80%','80%','#ef4444'],['50%','5%','#dc2626']].map(([t,l,c],i) => (
         <div key={i} style={{ position:'absolute', top:t, left:l, width:280, height:280, borderRadius:'50%', background:c, opacity:.05, filter:'blur(70px)', pointerEvents:'none', animation:`al-glow ${5+i}s ease-in-out infinite`, animationDelay:`${i*1.3}s` }} />
       ))}
 
-      {/* Rotating rings */}
       {[480,360].map((s,i) => (
         <div key={i} style={{ position:'absolute', width:s, height:s, borderRadius:'50%', border:'1px solid rgba(248,113,113,.05)', top:'50%', left:'50%', transform:'translate(-50%,-50%)', animation:`al-rotate ${35+i*10}s linear infinite`, pointerEvents:'none' }} />
       ))}
@@ -184,7 +208,6 @@ export default function AdminLoginPage() {
       <div className="al-card">
         <div className="al-scan" />
 
-        {/* Brand */}
         <div style={{ textAlign:'center', marginBottom:28 }}>
           <div style={{ width:62, height:62, background:'linear-gradient(135deg,#5c0d0d,#991b1b)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:27, margin:'0 auto 16px', boxShadow:'0 0 0 2px rgba(248,113,113,.25), 0 8px 24px rgba(0,0,0,.5)', animation:'al-pulse 3s ease-in-out infinite' }}>
             🛡️
@@ -197,7 +220,6 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Security notice */}
         <div style={{ background:'rgba(248,113,113,.06)', border:'1px solid rgba(248,113,113,.12)', borderRadius:12, padding:'10px 14px', marginBottom:22, display:'flex', gap:9, alignItems:'flex-start' }}>
           <span style={{ fontSize:14, flexShrink:0 }}>🔒</span>
           <span style={{ fontSize:11, color:'#7a3a3a', lineHeight:1.6 }}>
@@ -205,7 +227,6 @@ export default function AdminLoginPage() {
           </span>
         </div>
 
-        {/* Error */}
         {error && (
           <div className="al-error">
             <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
@@ -213,7 +234,6 @@ export default function AdminLoginPage() {
           </div>
         )}
 
-        {/* Email */}
         <div>
           <label style={{ fontSize:11, color:'#5a2a2a', textTransform:'uppercase', letterSpacing:'.5px', fontWeight:600, display:'block', marginBottom:7 }}>Email administrateur</label>
           <div className="al-input-wrap">
@@ -224,7 +244,6 @@ export default function AdminLoginPage() {
           </div>
         </div>
 
-        {/* Password */}
         <div>
           <label style={{ fontSize:11, color:'#5a2a2a', textTransform:'uppercase', letterSpacing:'.5px', fontWeight:600, display:'block', marginBottom:7 }}>Mot de passe</label>
           <div className="al-input-wrap">
@@ -236,26 +255,23 @@ export default function AdminLoginPage() {
           </div>
         </div>
 
-        {/* Submit */}
         <button className="al-submit" onClick={handleSubmit} disabled={loading} style={{ marginTop:6 }}>
           {loading
             ? <><span style={{ width:16, height:16, border:'2px solid rgba(255,255,255,.25)', borderTop:'2px solid white', borderRadius:'50%', animation:'al-spin 1s linear infinite', flexShrink:0 }} />Authentification...</>
             : <>🛡️ Connexion sécurisée</>}
         </button>
 
-        {/* Charge d'Étude Link */}
-        <p style={{ textAlign:'center', marginTop:16, fontSize:12, color:'#5a2a2a' }}>
-          Accès Charge d'Étude ? {' '}
-          <a href="/charge-etude-login" style={{ color:'#f87171', textDecoration:'none', fontWeight:600, cursor:'pointer' }}>
-            Aller ici
-          </a>
-        </p>
+        {/* 🔗 Liens vers les autres portails */}
+        <div className="al-links">
+          <a href="/decideur/login" className="al-link">Accès Décideur →</a>
+          <a href="/responsable-login" className="al-link">Accès Responsable de suivi →</a>
+          <a href="/charge-etude-login" className="al-link">Accès Charge d'Étude →</a>
+        </div>
 
-        {/* Divider */}
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:24, paddingTop:18, borderTop:'1px solid rgba(248,113,113,.08)' }}>
-          <div style={{ flex:1, height:1, background:'rgba(248,113,113,.06)' }} />
-          <span style={{ fontSize:10, color:'#3d1a1a', letterSpacing:'.5px', textTransform:'uppercase', fontWeight:600 }}>ANCS · Accès restreint © 2026</span>
-          <div style={{ flex:1, height:1, background:'rgba(248,113,113,.06)' }} />
+        <div className="al-footer">
+          <div className="al-footer-line" />
+          <span className="al-footer-text">ANCS · Accès restreint © 2026</span>
+          <div className="al-footer-line" />
         </div>
       </div>
     </div>

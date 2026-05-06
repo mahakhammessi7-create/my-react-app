@@ -13,9 +13,12 @@ import NotificationsPage from './pages/client/NotificationsPage';
 import GuidePage         from './pages/client/GuidePage';
 import ContactPage       from './pages/client/ContactPage';
 import UserManagement from './pages/admin/UserManagement';
+import ExpertManagement from './pages/admin/ExpertManagement';
 import TechnicalReviewInterface from './components/Module3_TechnicalReview/TechnicalReviewInterface';
 import ChargeEtudeDashboard from './pages/charge-etude/ChargeEtudeDashboard';
 import ChargeEtudeProfile from './pages/charge-etude/ChargeEtudeProfile';
+import DecideurLoginPage  from './pages/DecideurLoginpage';
+import DecideurDashboard  from './pages/decideur/DecideurDashboard';
 
 function App() {
   return (
@@ -34,6 +37,7 @@ function App() {
         <Route path="/admin/dashboard"  element={<AdminDashboard />}  />
         <Route path="/responsable/dashboard" element={<ResponsableDashboard />} />
         {/* ── Admin ── */}
+        <Route path="/admin/experts" element={<ExpertManagement />} />
         <Route path="/admin/users"      element={<UserManagement />}  />
         {/* ── ✅ New client pages ── */}
         <Route path="/client/profile"        element={<ClientDashboard />}   />
@@ -45,6 +49,8 @@ function App() {
         <Route path="/charge-etude/profile"    element={<ChargeEtudeProfile />} />
         {/* ── Technical Review Interface ── */}
         <Route path="/technical-review"      element={<TechnicalReviewInterface />} />
+        <Route path="/decideur/login"     element={<DecideurLoginPage />} />
+        <Route path="/decideur/dashboard" element={<DecideurDashboard />} />
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

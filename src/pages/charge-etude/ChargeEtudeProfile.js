@@ -42,6 +42,7 @@ const normalizeReport = (report) => ({
   ...report,
   status: String(report.status || report.validation_status || report.workflow_status || 'déposé').toLowerCase(),
   assigned_to: report.assigned_to || report.responsable || report.assigned_charge || report.charge || report.assignee || '',
+  charge_etude_id: report.charge_etude_id || report.chargeId || report.assigned_to_id || null,
 });
 
 export default function ChargeEtudeProfile() {
@@ -52,29 +53,146 @@ export default function ChargeEtudeProfile() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('user');
-      if (!saved) { navigate('/charge-etude-login'); return; }
-      const parsed = JSON.parse(saved);
-      if (!parsed || !isChargeEtudeRole(parsed.role)) { navigate('/charge-etude-login'); return; }
-      setUser(parsed);
-
-      API.get('/reports/all')
-        .then(res => {
-          const rows = res.data?.data || res.data?.reports || res.data || [];
-          const normalized = Array.isArray(rows) ? rows.map(normalizeReport) : [];
-          setReports(normalized.filter(r => r.assigned_to === parsed.username || r.assigned_to === parsed.email));
-        })
-        .catch(() => setError('Impossible de récupérer les rapports assignés.'))
-        .finally(() => setLoading(false));
-    } catch (err) {
-      console.error('Charge d\'étude profile init error', err);
-      localStorage.removeItem('user');
-      navigate('/charge-etude-login');
-    }
+    const initDashboard = async () => {
+      try {
+        console.log('🚀 Initialisation du dashboard Chargé d\'Étude');
+        
+        // Étape 1: Récupérer l'utilisateur du localStorage
+        const saved = localStorage.getItem('user');
+        if (!saved) {
+          console.log('❌ Aucun utilisateur trouvé dans localStorage');
+          navigate('/charge-etude-login');
+          return;
+        }
+        
+        const parsed = JSON.parse(saved);
+        console.log('👤 Utilisateur chargé depuis localStorage:', {
+          id: parsed.id,
+          username: parsed.username,
+          email: parsed.email,
+          full_name: parsed.full_name,
+          role: parsed.role
+        });
+        
+        // Vérification du rôle
+        if (!parsed || !isChargeEtudeRole(parsed.role)) {
+          console.log('❌ Échec de vérification du rôle. Rôle actuel:', parsed.role, 'Attendu: charge_etude');
+          navigate('/charge-etude-login');
+          return;
+        }
+        
+        console.log('✅ Vérification du rôle réussie');
+        setUser(parsed);
+        
+        // Étape 2: Récupérer tous les rapports
+        console.log('📡 Appel API: GET /reports/all');
+        const response = await API.get('/reports/all');
+        
+        console.log('📡 Réponse API reçue:', {
+          status: response.status,
+          statusText: response.statusText,
+          hasData: !!response.data,
+          dataType: typeof response.data,
+          dataKeys: response.data ? Object.keys(response.data) : []
+        });
+        
+        const rows = response.data?.data || response.data?.reports || response.data || [];
+        console.log('📊 Nombre de rapports bruts:', Array.isArray(rows) ? rows.length : 'Pas un tableau');
+        
+        const normalized = Array.isArray(rows) ? rows.map(normalizeReport) : [];
+        console.log('📊 Nombre de rapports normalisés:', normalized.length);
+        
+        // Log détaillé de tous les rapports
+        console.log('📋 Détails de tous les rapports:', normalized.map(r => ({
+          id: r.id,
+          title: r.title || r.company_name,
+          assigned_to: r.assigned_to,
+          charge_etude_id: r.charge_etude_id,
+          status: r.status
+        })));
+        
+        // Étape 3: Filtrer les rapports assignés à cet utilisateur
+        console.log('🔍 Critères de filtrage:', {
+          id: parsed.id,
+          username: parsed.username,
+          email: parsed.email,
+          full_name: parsed.full_name
+        });
+        
+        const filtered = normalized.filter(r => {
+          // Match par ID (le plus fiable)
+          const matchById = r.charge_etude_id === parsed.id;
+          
+          // Match par nom complet
+          const matchByFullName = r.assigned_to === parsed.full_name;
+          
+          // Match par username ou email (fallback)
+          const matchByUsername = r.assigned_to === parsed.username;
+          const matchByEmail = r.assigned_to === parsed.email;
+          
+          const match = matchById || matchByFullName || matchByUsername || matchByEmail;
+          
+          if (match) {
+            console.log(`✅ Rapport #${r.id} assigné:`, {
+              assigned_to: r.assigned_to,
+              charge_etude_id: r.charge_etude_id,
+              match_type: matchById ? 'ID' : (matchByFullName ? 'Nom complet' : (matchByUsername ? 'Username' : 'Email'))
+            });
+          } else if (r.assigned_to || r.charge_etude_id) {
+            console.log(`❌ Rapport #${r.id} non assigné à cet utilisateur:`, {
+              assigned_to: r.assigned_to,
+              expected_username: parsed.username,
+              expected_email: parsed.email,
+              expected_fullname: parsed.full_name,
+              charge_etude_id: r.charge_etude_id,
+              expected_id: parsed.id
+            });
+          }
+          
+          return match;
+        });
+        
+        console.log('✅ Rapports filtrés trouvés:', filtered.length);
+        
+        if (filtered.length === 0) {
+          console.warn('⚠️ Aucun rapport trouvé pour cet utilisateur. Vérifiez les assignations dans la base de données.');
+        } else {
+          console.log('📋 Liste des rapports assignés:', filtered.map(r => ({
+            id: r.id,
+            company: r.company_name || r.organism_name,
+            status: r.status
+          })));
+        }
+        
+        setReports(filtered);
+        setLoading(false);
+        
+      } catch (err) {
+        console.error('💥 Erreur lors de l\'initialisation:', {
+          message: err.message,
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: err.response?.data,
+          stack: err.stack
+        });
+        
+        setError('Impossible de récupérer les rapports assignés. Vérifiez votre connexion.');
+        setLoading(false);
+        
+        // En cas d'erreur critique, rediriger vers login
+        if (err.response?.status === 401) {
+          console.log('🔒 Token expiré ou invalide, redirection vers login');
+          localStorage.removeItem('user');
+          navigate('/charge-etude-login');
+        }
+      }
+    };
+    
+    initDashboard();
   }, [navigate]);
 
   const handleLogout = () => {
+    console.log('🚪 Déconnexion de l\'utilisateur:', user?.username);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('extractedData');
@@ -87,7 +205,13 @@ export default function ChargeEtudeProfile() {
 
   const assignedCount = reports.length;
   const readyForReview = reports.filter(r => r.status === 'assigned' || r.status === 'deposé' || r.status === 'déposé').length;
-  const verifiedCount = reports.filter(r => r.status === 'verified').length;
+  const verifiedCount = reports.filter(r => r.status === 'verified' || r.status === 'validated').length;
+
+  console.log('📊 Statistiques utilisateur:', {
+    assignedCount,
+    readyForReview,
+    verifiedCount
+  });
 
   return (
     <div className="cep-root">
@@ -102,7 +226,7 @@ export default function ChargeEtudeProfile() {
       <div className="cep-container">
         <div className="cep-hero">
           <div className="cep-card">
-            <div className="cep-title">Bonjour {user.username}</div>
+            <div className="cep-title">Bonjour {user.full_name || user.username}</div>
             <div className="cep-subtitle">Voici votre espace personnel et les rapports qui vous sont attribués.</div>
             <div className="cep-field">
               <span className="cep-label">Rôle</span>
@@ -114,10 +238,10 @@ export default function ChargeEtudeProfile() {
                 <div className="cep-value">{user.email}</div>
               </div>
             )}
-            {user.phone && (
+            {user.username && (
               <div className="cep-field">
-                <span className="cep-label">Téléphone</span>
-                <div className="cep-value">{user.phone}</div>
+                <span className="cep-label">Nom d'utilisateur</span>
+                <div className="cep-value">{user.username}</div>
               </div>
             )}
             <div className="cep-field">
@@ -153,13 +277,19 @@ export default function ChargeEtudeProfile() {
           ) : error ? (
             <div className="cep-error">{error}</div>
           ) : assignedCount === 0 ? (
-            <div style={{ marginTop: 18, color: '#94a3b8' }}>Aucun rapport assigné pour le moment.</div>
+            <div style={{ marginTop: 18, color: '#94a3b8' }}>
+              Aucun rapport assigné pour le moment. 
+              {user.id && <span style={{ display: 'block', fontSize: 11, marginTop: 8 }}>ID utilisateur: {user.id}</span>}
+            </div>
           ) : (
             <div className="cep-list">
               {reports.map((report) => (
                 <div key={report.id} className="cep-report">
                   <div className="cep-report-title">{report.organism_name || report.company_name || 'Rapport #' + report.id}</div>
-                  <div className="cep-report-meta">Secteur : {report.organism_sector || report.sector || '—'} · Téléversé le {report.upload_date ? new Date(report.upload_date).toLocaleDateString('fr-FR') : '—'}</div>
+                  <div className="cep-report-meta">
+                    Secteur : {report.organism_sector || report.sector || '—'} · 
+                    Téléversé le {report.upload_date ? new Date(report.upload_date).toLocaleDateString('fr-FR') : '—'}
+                  </div>
                   <div className="cep-report-status">{(report.status || 'en attente').toUpperCase()}</div>
                 </div>
               ))}
