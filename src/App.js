@@ -6,7 +6,7 @@ import AdminLoginPage from './pages/AdminloginPage';
 import ChargeEtudeLoginPage from './pages/ChargeEtudeLoginPage';
 import ResponsableLoginPage from './pages/ResponsableLoginPage';
 import AuditForm from './components/Module1_Conformity/AuditForm';
-import AdminDashboard  from './pages/admin/AdminDashboard';
+import AdminHub  from './pages/admin/AdminHub';
 import ResponsableDashboard from './pages/responsable/ResponsableDashboard';
 import ClientDashboard   from './pages/client/ClientDashboard';
 import NotificationsPage from './pages/client/NotificationsPage';
@@ -34,7 +34,7 @@ function App() {
         <Route path="/responsable-login"   element={<ResponsableLoginPage />}   />
         {/* ── Dashboards ── */}
         <Route path="/client/dashboard" element={<AuditForm />} />
-        <Route path="/admin/dashboard"  element={<AdminDashboard />}  />
+        <Route path="/admin/dashboard"  element={<AdminHub />}  />
         <Route path="/responsable/dashboard" element={<ResponsableDashboard />} />
         {/* ── Admin ── */}
         <Route path="/admin/experts" element={<ExpertManagement />} />
