@@ -28,6 +28,7 @@ function Modal({ user, onClose, onSave }) {
     sector:   user.sector   || "",
     phone:    user.phone    || "",
     status:   user.status   || "active",
+     password: "",
   });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -46,7 +47,14 @@ function Modal({ user, onClose, onSave }) {
               <label className="form-label">{lbl}</label>
               <input className="form-input" type={t} value={form[k]} placeholder={lbl} onChange={e=>set(k,e.target.value)} />
             </div>
-          ))}
+          ))}{/* ← Nouveau : mot de passe uniquement à la création */}
+          {isNew && (
+            <div className="form-group">
+              <label className="form-label">Mot de passe</label>
+              <input className="form-input" type="password" value={form.password}
+                placeholder="Mot de passe" onChange={e=>set("password",e.target.value)} />
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">Statut</label>
             <select className="form-input" value={form.status} onChange={e=>set("status",e.target.value)}>
@@ -133,44 +141,49 @@ export default function ExpertManagement() {
   });
 
   const toggleStatus = async id => {
-    const u = users.find(u=>u.id===id);
-    if (!u) return;
-    const newStatus = u.status==="active"?"inactive":"active";
-    try {
-      await API.patch(`/api/users/${id}`, {status:newStatus});
-      setUsers(p=>p.map(u=>u.id===id?{...u,status:newStatus}:u));
-      showToast("Statut mis à jour");
-    } catch { showToast("Erreur","danger"); }
-  };
+  const u = users.find(u=>u.id===id);
+  const newStatus = u.status==="active"?"inactive":"active";
+  await API.patch(`/users/${id}`, {status:newStatus});
+  setUsers(p=>p.map(u=>u.id===id?{...u,status:newStatus}:u));
+};
 
-  const handleSave = async form => {
-    try {
-      if (editUser.id) {
-        await API.patch(`/api/users/${editUser.id}`, {
-          full_name:form.name, email:form.email,
-          role:"expert_auditeur",
-          status:form.status, company_name:form.organism,
-          sector:form.sector, phone:form.phone,
-        });
-        setUsers(p=>p.map(u=>u.id===editUser.id?{...u,...form,role:"expert_auditeur"}:u));
-        showToast("Expert modifié");
-      } else {
-        const res = await API.post("/users", {
-          full_name:form.name, email:form.email,
-          role:"expert_auditeur",
-          status:form.status, company_name:form.organism,
-          sector:form.sector, phone:form.phone,
-        });
-        setUsers(p=>[...p, normalize(res.data?.data||res.data)]);
-        showToast("Expert créé");
+// Add better error logging to handleSave
+const handleSave = async form => {
+  try {
+    const payload = {
+      full_name:    form.name,
+      email:        form.email,
+      role:         "expert_auditeur",   // ← fixé, pas depuis form.role
+      status:       form.status,
+      company_name: form.organism,
+      sector:       form.sector,
+      phone:        form.phone,
+    };
+    if (form.password) payload.password = form.password;
+
+    if (editUser.id) {
+      await API.patch(`/users/${editUser.id}`, payload);
+      setUsers(p=>p.map(u=>u.id===editUser.id?{...u,...form}:u));
+      showToast("Expert modifié");
+    } else {
+      if (!form.password) {
+        showToast("Le mot de passe est requis","danger");
+        return;
       }
-    } catch { showToast("Erreur lors de la sauvegarde","danger"); }
-    setEditUser(null);
-  };
+      const res = await API.post("/users", payload);
+      setUsers(p=>[...p, normalize(res.data?.data||res.data)]);
+      showToast("Expert créé");
+    }
+  } catch (err) {
+    console.error(err);
+    showToast("Erreur lors de la sauvegarde","danger");
+  }
+  setEditUser(null);
+};
 
   const handleDelete = async () => {
     try {
-      await API.delete(`/api/users/${deleteUser.id}`);
+      await API.delete(`/users/${deleteUser.id}`);
       setUsers(p=>p.filter(u=>u.id!==deleteUser.id));
       showToast("Expert supprimé","danger");
     } catch { showToast("Erreur","danger"); }

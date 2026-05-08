@@ -482,6 +482,43 @@ function validateContent(text) {
   return { isEmpty:false, results, errors, score, isValid:errors.length===0, wordCount };
 }
 
+function buildAnnexeStatus(tables, text) {
+  const lower = text.toLowerCase();
+  const status = {};
+  
+  // Annexe 1 status
+  const annexe1Data = extractAnnexe1(tables);
+  const annexe1FilledCount = Object.values(annexe1Data).filter(v => v && v.trim().length > 0).length;
+  status.annexe1 = {
+    status: annexe1FilledCount >= 3 ? 'filled' : (annexe1FilledCount > 0 ? 'partial' : 'empty'),
+    title: 'Identification de l\'Organisme',
+    row_count: annexe1FilledCount,
+  };
+  
+  // Annexe 3 status
+  const servers = extractServersFromTable(tables);
+  const apps = extractAppsFromTable(tables);
+  const network = extractNetworkFromTable(tables);
+  const annexe3FilledCount = (servers.length > 0 ? 1 : 0) + (apps.length > 0 ? 1 : 0) + (network.length > 0 ? 1 : 0);
+  status.annexe3 = {
+    status: annexe3FilledCount >= 2 ? 'filled' : (annexe3FilledCount > 0 ? 'partial' : 'empty'),
+    title: 'Description du Système d\'Information',
+    row_count: servers.length + apps.length + network.length,
+  };
+  
+  // Annexe 7 status
+  const indicators = extractIndicateurs(tables);
+  const validIndicators = indicators.filter(ind => !isHeaderRow(ind));
+  const annexe7FilledCount = validIndicators.length;
+  status.annexe7 = {
+    status: annexe7FilledCount >= 10 ? 'filled' : (annexe7FilledCount >= 3 ? 'partial' : 'empty'),
+    title: 'Indicateurs de Sécurité',
+    row_count: annexe7FilledCount,
+  };
+  
+  return status;
+}
+
 function buildExtractedData(validation, user, text, html) {
   const { score } = validation;
   const tables       = html ? parseHtmlTables(html) : [];
@@ -503,6 +540,10 @@ function buildExtractedData(validation, user, text, html) {
   const partielInd  = indicators.filter(i => /partiel|en cours|prévu/i.test(i.valeur)).length;
   const nonConfInd  = indicators.filter(i => /^(non|absent|inexistant|0)/i.test(i.valeur)).length;
   const totalInd    = indicators.length;
+  
+  // Build annexe_status
+  const annexe_status = buildAnnexeStatus(tables, text);
+  
   return {
     company: {
       name:             annexe1Data.companyName || user?.company_name || 'Non renseigné',
@@ -539,6 +580,7 @@ function buildExtractedData(validation, user, text, html) {
     reseauListe:       network,
     risquesListe:      risques,
     indicators,
+    annexe_status,     // <-- ADDED HERE
   };
 }
 
@@ -560,6 +602,7 @@ export default function AuditForm() {
   const [wordCount,    setWordCount]    = useState(0);
   const [apiError,     setApiError]     = useState('');
   const [expanded,     setExpanded]     = useState(null);
+  const [extracted,    setExtracted]    = useState(null);
 
   useEffect(() => {
     inject();
@@ -573,7 +616,7 @@ export default function AuditForm() {
     const ext = f.name.split('.').pop().toLowerCase();
     if (!['pdf','docx'].includes(ext)) { alert('Format non supporté. Utilisez PDF ou DOCX.'); return; }
     setFile(f); setStatus('idle'); setProgress(0);
-    setErrors([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null);
+    setErrors([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null); setExtracted(null);
   };
 
   const handleVerify = async () => {
@@ -603,16 +646,27 @@ export default function AuditForm() {
         setErrors(validation.errors);
         setStatus('fail'); return;
       }
-      const extracted = buildExtractedData(validation, user, text, html);
+      const extracted =buildExtractedData(validation, user, text, html);
+      setExtracted(extracted);
       localStorage.setItem('extractedData', JSON.stringify(extracted));
       const token = localStorage.getItem('token');
       if (token) {
         setStatus('saving');
         try {
-          await API.post('/reports/upload', {
-            filename:         file.name,
-            compliance_score: validation.score,
-            extracted_data:   extracted,
+          const formData = new FormData();
+          formData.append('report', file);
+          formData.append('compliance_score', validation.score);
+          formData.append('organism_name',   extracted.company?.name   || '');
+          formData.append('organism_sector', extracted.company?.sector || '');
+          formData.append('is_compliant',    validation.score >= 75);
+          formData.append('maturity_level',  extracted.company?.maturity_level || 1);
+          formData.append('has_rssi',        extracted.company?.has_rssi || false);
+          formData.append('has_pssi',        extracted.company?.has_pssi || false);
+          formData.append('has_pca',         extracted.company?.has_pca  || false);
+          formData.append('has_pra',         extracted.company?.has_pra  || false);
+
+          await API.post('/reports/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
           });
         } catch (apiErr) {
           const msg = apiErr.response?.data?.error || apiErr.message;
@@ -637,7 +691,7 @@ export default function AuditForm() {
 
   const reset = () => {
     setFile(null); setStatus('idle'); setProgress(0);
-    setErrors([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null);
+    setErrors([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null); setExtracted(null);
   };
 
   const onDragOver  = (e) => { e.preventDefault(); setDrag(true); };
@@ -806,6 +860,55 @@ export default function AuditForm() {
                     </div>
                   ))}
                 </div>
+
+                {/* ========== ANNEXE STATUS — NEW BLOCK ========== */}
+                {extracted && extracted.annexe_status && (
+                  <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 14 }}>
+                    <div style={{ fontSize: 11, color: '#3d607a', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, marginBottom: 10 }}>
+                      État des annexes extraites
+                    </div>
+                    {Object.entries(extracted.annexe_status || {}).map(([key, val]) => {
+                      const num      = key.replace('annexe', '');
+                      const isEmpty  = val.status === 'empty';
+                      const isPartial = val.status === 'partial';
+                      const color    = isEmpty ? RED : isPartial ? AMBER : GREEN;
+                      const icon     = isEmpty ? '❌' : isPartial ? '⚠️' : '✅';
+                      const label    = isEmpty ? 'Vide' : isPartial ? 'Partiel' : 'Rempli';
+
+                      return (
+                        <div key={key} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '7px 0',
+                          borderBottom: '1px solid rgba(255,255,255,.04)',
+                          fontSize: 12,
+                        }}>
+                          <span style={{ fontSize: 13, flexShrink: 0 }}>{icon}</span>
+                          <span style={{ color: '#8ab0c8', flex: 1 }}>
+                            Annexe {num}
+                            {val.title ? ` — ${val.title}` : ''}
+                          </span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700,
+                            color, background: `${color}15`,
+                            border: `1px solid ${color}30`,
+                            padding: '2px 8px', borderRadius: 99,
+                            textTransform: 'uppercase', letterSpacing: '.4px',
+                          }}>
+                            {label}
+                          </span>
+                          {val.row_count > 0 && (
+                            <span style={{ fontSize: 10, color: '#2a4a62' }}>{val.row_count} lignes</span>
+                          )}
+                          {isEmpty && (
+                            <span style={{ fontSize: 10, color: RED }}>⚠ Données manquantes</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* ========== END ANNEXE STATUS ========== */}
+
               </div>
             )}
 
