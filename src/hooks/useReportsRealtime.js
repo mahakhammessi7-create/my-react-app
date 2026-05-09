@@ -2,8 +2,8 @@
 // Pour le Responsable : écoute les nouveaux rapports en temps réel
 
 import { useEffect, useState, useCallback } from "react";
-import supabase from '../lib/supabaseClient'; // adapte le chemin
-
+ // adapte le chemin
+import supabase from '../lib/supabaseClient';
 /**
  * useReportsRealtime
  * - charge tous les rapports au statut "déposé" au montage

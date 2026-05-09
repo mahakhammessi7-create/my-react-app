@@ -1,110 +1,92 @@
-// hooks/useMyAssignedReports.js
-// Pour le Chargé d'étude : voit en temps réel les rapports qui lui sont assignés
+import { useState, useEffect, useCallback } from 'react';
+import supabase from '../lib/supabaseClient'; // adapter le chemin
 
-import { useEffect, useState, useCallback } from "react";
-
-import supabase from '../lib/supabaseClient';
-
-/**
- * useMyAssignedReports
- * @param {number} currentUserId - l'ID du chargé d'étude connecté
- */
-export function useMyAssignedReports(currentUserId, onNewAssignment) {
+export const useMyAssignedReports = (userId, onNewAssignment = null) => {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError]   = useState(null);
 
-  const fetchMyReports = useCallback(async () => {
-    if (!currentUserId) return;
-    setLoading(true);
+  const fetchAssignedReports = useCallback(async () => {
+  if (!userId) { setLoading(false); return; }
 
-    const { data, error } = await supabase
-      .from("reports")
-      .select(`
-        *,
-        client:users!reports_user_id_fkey(id, full_name, email, company_name)
-      `)
-      .eq("assigned_to", currentUserId)
-      .eq("status", "assigné")
-      .order("upload_date", { ascending: false });
+  console.log('🔍 Fetching reports pour userId:', userId);
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setReports(data || []);
-    }
-    setLoading(false);
-  }, [currentUserId]);
+  const { data, error: sbError } = await supabase
+    .from('reports')
+    .select('*')
+    .eq('assigned_to', userId)          // ← integer, pas email
+    .order('upload_date', { ascending: false });
+
+  if (sbError) {
+    console.error('❌ Supabase error:', sbError);
+    setReports([]);
+  } else {
+    console.log('✅ Rapports:', data?.length, data);
+    setReports(data || []);
+  }
+  setLoading(false);
+}, [userId]);
 
   useEffect(() => {
-    if (!currentUserId) return;
-    fetchMyReports();
+    fetchAssignedReports();
+    const interval = setInterval(fetchAssignedReports, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAssignedReports]);
 
-    // Écoute uniquement les rapports assignés à CET utilisateur
+  // Realtime Supabase subscription
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    const email  = stored ? JSON.parse(stored)?.email : null;
+    if (!email) return;
+
     const channel = supabase
-      .channel(`charge-etude-${currentUserId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "reports",
-          filter: `assigned_to=eq.${currentUserId}`,
-        },
-        async (payload) => {
-          if (payload.new.status === "assigné") {
-            // Nouveau rapport assigné → l'ajouter à la liste
-            const { data } = await supabase
-              .from("reports")
-              .select(`
-                *,
-                client:users!reports_user_id_fkey(id, full_name, email, company_name)
-              `)
-              .eq("id", payload.new.id)
-              .single();
-
-            if (data) {
-              setReports((prev) => {
-                const exists = prev.some((r) => r.id === data.id);
-                if (!exists && onNewAssignment) {
-                  onNewAssignment(data);
-                }
-                if (exists) return prev.map((r) => (r.id === data.id ? data : r));
-                return [data, ...prev];
-              });
-            }
-          } else {
-            // Le statut a changé (validé, clôturé...) → le retirer de la liste
-            setReports((prev) => prev.filter((r) => r.id !== payload.new.id));
-          }
+      .channel('my-reports')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'reports',
+        filter: `assigned_to=eq.${email}`
+      }, (payload) => {
+        console.log('🔔 Realtime update:', payload);
+        if (payload.eventType === 'UPDATE' && payload.new?.assigned_to === email) {
+          onNewAssignment?.(payload.new);
         }
-      )
+        fetchAssignedReports();
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentUserId, fetchMyReports]);
+    return () => supabase.removeChannel(channel);
+  }, [userId, fetchAssignedReports, onNewAssignment]);
 
-  /**
-   * Le chargé d'étude valide un rapport
-   * @param {number} reportId
-   */
-  const validateReport = async (reportId) => {
-    const { error } = await supabase
-      .from("reports")
-      .update({
-        status: "validé",
-        validated_by: currentUserId,
-        validation_date: new Date().toISOString(),
-      })
-      .eq("id", reportId);
-
-    if (!error) {
-      setReports((prev) => prev.filter((r) => r.id !== reportId));
+  const validateReport = useCallback(async (reportId) => {
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .update({ status: 'verified', validated_by: userId, validation_date: new Date().toISOString() })
+        .eq('id', reportId);
+      if (error) return { success: false, error: error.message };
+      setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: 'verified' } : r));
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
     }
-    return { success: !error, error: error?.message };
-  };
+  }, [userId]);
 
-  return { reports, loading, error, validateReport, refetch: fetchMyReports };
-}
+  const rejectReport = useCallback(async (reportId, reason = '') => {
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .update({ status: 'rejected' })
+        .eq('id', reportId);
+      if (error) return { success: false, error: error.message };
+      setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: 'rejected' } : r));
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }, [userId]);
+
+  return { reports, loading, error, validateReport, rejectReport, refetch: fetchAssignedReports };
+};
+
+export default useMyAssignedReports;

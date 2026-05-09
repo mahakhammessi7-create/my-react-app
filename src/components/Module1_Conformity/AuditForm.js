@@ -92,6 +92,9 @@ const GREEN= '#4ade80';
 const RED  = '#f87171';
 const AMBER= '#fbbf24';
 
+// ══════════════════════════════════════════════
+//  ALL 9 ANNEXES DEFINITION
+// ══════════════════════════════════════════════
 const ANNEXES = [
   {
     key:   'annexe1',
@@ -106,6 +109,17 @@ const ANNEXES = [
     minSubChecks: 3,
   },
   {
+    key:   'annexe2',
+    label: 'Annexe 2 — Cartographie des Processus (DIC)',
+    subChecks: [
+      { label:'Désignation du processus', keywords:['désignation du processus', 'designation du processus', 'processus 1', 'processus métier'] },
+      { label:'Confidentialité',          keywords:['confidentialité', 'confidentialite'] },
+      { label:'Intégrité',                keywords:['intégrité', 'integrite'] },
+      { label:'Disponibilité',            keywords:['disponibilité', 'disponibilite'] },
+    ],
+    minSubChecks: 2,
+  },
+  {
     key:   'annexe3',
     label: 'Annexe 3 — Description du Système d\'Information',
     subChecks: [
@@ -113,6 +127,41 @@ const ANNEXES = [
       { label:'Serveurs (par plateforme)',         keywords:['serveurs', 'serveur', 'système d\'exploitation', '@ip', 'rôle'] },
       { label:'Infrastructure Réseau & Sécurité', keywords:['infrastructure réseau', 'infrastructure réseau et sécurité', 'nature', 'marque', 'firewall', 'routeur', 'switch'] },
       { label:'Postes de travail',                keywords:['postes de travail', 'poste de travail', 'système d\'exploitation', 'nombre'] },
+    ],
+    minSubChecks: 3,
+  },
+  {
+    key:   'annexe4',
+    label: 'Annexe 4 — Planning d\'Exécution Réel',
+    subChecks: [
+      { label:'Composant / Phase',        keywords:['phase 1', 'phase 2', 'composant', 'objet de la sous phase'] },
+      { label:'Équipe intervenante',      keywords:['équipe intervenante', 'equipe intervenante', 'nom:', 'intervenant'] },
+      { label:'Durée en Hommes/jours',    keywords:['hommes/jours', 'homme/jour', 'h/j', 'durée totale'] },
+      { label:'Dates de réalisation',     keywords:['date(s) de réalisation', 'date de realisation', 'sur site'] },
+    ],
+    minSubChecks: 2,
+  },
+  {
+    key:   'annexe5',
+    label: 'Annexe 5 — Évaluation du Plan d\'Action Précédent',
+    subChecks: [
+      { label:'Projet / Action',          keywords:['projet 1', 'action 1.1', 'action 1', 'projet 2'] },
+      { label:'Criticité',                keywords:['criticité', 'criticite'] },
+      { label:'Taux de réalisation',      keywords:['taux de réalisation', 'taux de realisation'] },
+      { label:'Évaluation',               keywords:['évaluation', 'evaluation'] },
+      { label:'Chargé de l\'action',      keywords:['chargé de l\'action', 'charge de l\'action'] },
+    ],
+    minSubChecks: 2,
+  },
+  {
+    key:   'annexe6',
+    label: 'Annexe 6 — État de Maturité de la Sécurité du SI',
+    subChecks: [
+      { label:'Mesures organisationnelles (dom. 5)', keywords:['mesures de sécurité organisationnelles', 'mesures organisationnelles', '5.1 politiques', '5.2 fonctions'] },
+      { label:'Mesures liées aux personnes (dom. 6)', keywords:['mesures liées aux personnes', 'mesures de sécurité applicables aux personnes', '6.1', '6.2'] },
+      { label:'Mesures de sécurité physique (dom. 7)', keywords:['mesures de sécurité physique', '7.1', '7.2', 'périmètres de sécurité physique'] },
+      { label:'Mesures technologiques (dom. 8)',       keywords:['mesures de sécurité technologiques', 'mesures technologiques', '8.1', '8.2'] },
+      { label:'Valeur attribuée / Score maturité',     keywords:['valeur attribuée', 'valeur attribuee', 'critère d\'évaluation', 'critere d\'evaluation'] },
     ],
     minSubChecks: 3,
   },
@@ -133,7 +182,90 @@ const ANNEXES = [
     ],
     minSubChecks: 6,
   },
+  {
+    key:   'annexe8',
+    label: 'Annexe 8 — Vulnérabilités Très Critiques',
+    subChecks: [
+      { label:'Section Annexe 8 présente',            keywords:['annexe 8', 'annexe8', 'vulnérabilités très critiques', 'liste des vulnérabilités'] },
+      { label:'Référence / Identifiant vulnérabilité', keywords:['vuln-tt', 'vuln-', 'référence de la vulnérabilité', 'reference de la vulnerabilite'] },
+      { label:'Actifs / Composantes impactés',         keywords:['actifs impactés', 'actifs impactes', 'actifs impacté', 'composante'] },
+      { label:'Impact ou Description',                 keywords:['impact d\'exploitation', 'impact/conséquence', 'impact'] },
+      { label:'Recommandation',                        keywords:['recommandation', 'recommandations'] },
+    ],
+    minSubChecks: 2,
+  },
+  {
+    key:   'annexe9',
+    label: 'Annexe 9 — Plan d\'Action Proposé',
+    subChecks: [
+      { label:'Projet / Action',                  keywords:['plan d\'action', 'projet :', 'action :', 'action proposée', 'actions proposées'] },
+      { label:'Criticité',                        keywords:['criticité', 'criticite'] },
+      { label:'Charge (H/J)',                     keywords:['charge (h/j)', 'h/j', 'charge h/j', 'homme/jour'] },
+      { label:'Chargé de l\'action',              keywords:['chargé de l\'action', 'charge de l\'action', 'responsable'] },
+      { label:'Délai de mise en œuvre',           keywords:['délai', 'delai', 'mise en œuvre', 'mise en oeuvre', 'échéance'] },
+    ],
+    minSubChecks: 2,
+  },
 ];
+
+// ══════════════════════════════════════════════
+// ANNEXE 7 — Expected indicators with their
+// keywords. Each must have a NON-EMPTY valeur
+// to count as "filled". If the row exists but
+// valeur is blank/null → "partial/empty".
+// ══════════════════════════════════════════════
+const ANNEXE7_EXPECTED = [
+  { key: 'rssi_nomination',   keywords: ['nomination officielle rssi', 'nomination rssi'],        label: 'Nomination officielle RSSI' },
+  { key: 'rssi_fiche',        keywords: ['fiche de poste rssi', 'fiche de poste'],                label: 'Fiche de poste RSSI' },
+  { key: 'cellule_secu',      keywords: ['cellule sécurité', 'cellule securite', 'cellule de sécurité'], label: 'Cellule sécurité SI' },
+  { key: 'comite_ssi',        keywords: ['comité sécurité', 'comite securite', 'comité ssi'],     label: 'Comité SSI formalisé' },
+  { key: 'pssi_existence',    keywords: ['existence formelle pssi', 'pssi'],                      label: 'Existence formelle PSSI' },
+  { key: 'pssi_portee',       keywords: ['portée de la pssi', 'portee de la pssi'],               label: 'Portée de la PSSI' },
+  { key: 'pssi_comm',         keywords: ['communication de la pssi', 'communication pssi'],       label: 'Communication PSSI' },
+  { key: 'pssi_maintien',     keywords: ['maintien de la pssi', 'revision pssi', 'révision pssi'], label: 'Maintien / révision PSSI' },
+  { key: 'pca',               keywords: ['pca', 'plan de continuité'],                            label: 'PCA existant' },
+  { key: 'pra',               keywords: ['pra', 'plan de reprise'],                               label: 'PRA existant' },
+  { key: 'site_secours',      keywords: ['site secours', 'site de secours'],                      label: 'Site de secours' },
+  { key: 'org_crise',         keywords: ['organisation de crise', 'crise'],                       label: 'Organisation de crise' },
+  { key: 'inventaire',        keywords: ['inventaire complet', 'inventaire des actifs'],          label: 'Inventaire complet des actifs' },
+  { key: 'classification',    keywords: ['classification', 'classification des actifs'],          label: 'Classification des actifs' },
+  { key: 'risques_si',        keywords: ['gestion des risques si', 'risques si'],                 label: 'Gestion des risques SI' },
+  { key: 'incidents',         keywords: ['cellule de gestion des incidents', 'gestion des incidents'], label: 'Gestion des incidents' },
+  { key: 'sauvegarde',        keywords: ['politique formelle de sauvegarde', 'gestion des sauvegardes', 'sauvegarde'], label: 'Politique de sauvegarde' },
+  { key: 'sauvegarde_dist',   keywords: ['copies à un site distant', 'site distant', 'sauvegarde distante'], label: 'Sauvegardes distantes' },
+  { key: 'patches',           keywords: ['patches', 'correctifs', 'déploiement automatique'],     label: 'Déploiement automatique des patches' },
+  { key: 'acces_logique',     keywords: ['contrôle d\'accès', 'contrôleur de domaine', 'vlan', 'proxy'], label: 'Contrôle d\'accès logique' },
+  { key: 'antivirus',         keywords: ['protection antivirale', 'antivirus', 'antivirale'],     label: 'Protection antivirale' },
+  { key: 'siem',              keywords: ['siem', 'ids', 'ips', 'supervision'],                    label: 'SIEM / IDS / IPS' },
+  { key: 'dc_physique',       keywords: ['data-center', 'datacenter', 'local data-center'],       label: 'Sécurité physique Data Center' },
+  { key: 'climatisation',     keywords: ['climatisation'],                                         label: 'Climatisation DC' },
+  { key: 'onduleurs',         keywords: ['onduleurs', 'onduleur'],                                label: 'Onduleurs / alimentation secourue' },
+  { key: 'incendie',          keywords: ['incendie', 'détection incendie'],                       label: 'Protection incendie' },
+  { key: 'foudre',            keywords: ['foudre', 'anti-foudre', 'parafoudre'],                  label: 'Protection anti-foudre' },
+  { key: 'cablage',           keywords: ['câblage', 'cablage'],                                   label: 'Sécurité câblage réseau' },
+  { key: 'dev_test_prod',     keywords: ['séparation', 'dev/test/prod', 'environnement'],         label: 'Séparation environnements dev/test/prod' },
+  { key: 'maintenance',       keywords: ['contrats de maintenance', 'maintenance'],               label: 'Contrats de maintenance' },
+];
+
+// ══════════════════════════════════════════════
+// KEY FIX: Check if an Annexe 7 indicator row
+// has a meaningful (non-empty) value filled in.
+// Returns: { found: bool, hasValue: bool, valeur: string }
+// ══════════════════════════════════════════════
+function checkIndicatorValue(indicators, keywords) {
+  const normalize = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const row = indicators.find(ind =>
+    keywords.some(kw => normalize(ind.indicateur).includes(normalize(kw)))
+  );
+  if (!row) return { found: false, hasValue: false, valeur: '' };
+
+  const val = (row.valeur || '').trim();
+  // Empty, placeholder, or null-like values are NOT considered filled
+  const isEmpty = !val || val === '' || val === '-' || val === '—' || val === '…'
+    || val.toLowerCase() === 'null' || val.toLowerCase() === 'n/a';
+
+  return { found: true, hasValue: !isEmpty, valeur: val, commentaire: row.commentaire || '' };
+}
 
 async function readDocxHtml(file) {
   const arrayBuffer = await file.arrayBuffer();
@@ -210,6 +342,174 @@ function extractAnnexe1(tables) {
     }
   });
   return result;
+}
+
+function extractAnnexe2(tables) {
+  const processes = [];
+  tables.forEach(table => {
+    if (table.length < 2) return;
+    const header = (table[0] || []).map(c => c.toLowerCase());
+    if (!header.some(h => h.includes('processus')) || !header.some(h => h.includes('confidentialit') || h.includes('disponibilit') || h.includes('intégrit'))) return;
+    table.slice(1).forEach(row => {
+      const name = row[0]?.trim();
+      if (!name || name.toLowerCase().includes('processus') || name.trim() === '…') return;
+      processes.push({
+        name,
+        confidentialite: row[1]?.trim() || '',
+        integrite:       row[2]?.trim() || '',
+        disponibilite:   row[3]?.trim() || '',
+      });
+    });
+  });
+  return processes;
+}
+
+function extractAnnexe4(tables) {
+  const phases = [];
+  tables.forEach(table => {
+    if (table.length < 3) return;
+    const flat = table.map(r => r.join(' ').toLowerCase()).join(' ');
+    if (!flat.includes('phase') || !flat.includes('durée') && !flat.includes('h/j')) return;
+    let current = null;
+    table.slice(1).forEach(row => {
+      const first = row[0]?.trim();
+      if (!first) return;
+      if (/^phase\s*\d/i.test(first)) {
+        current = { phase: first, steps: [] };
+        phases.push(current);
+      } else if (current && first && first !== '…') {
+        current.steps.push(first);
+      }
+    });
+  });
+  return phases;
+}
+
+function extractAnnexe5(tables) {
+  const actions = [];
+  tables.forEach(table => {
+    if (table.length < 3) return;
+    const flat = table.map(r => r.join(' ').toLowerCase()).join(' ');
+    if (!flat.includes('projet') || !flat.includes('action') || !flat.includes('taux')) return;
+    let currentProject = '';
+    table.slice(1).forEach(row => {
+      const proj   = row[0]?.trim();
+      const action = row[1]?.trim();
+      if (proj && proj !== '…') currentProject = proj;
+      if (!action || action === '…') return;
+      actions.push({
+        projet:          currentProject,
+        action,
+        criticite:       row[2]?.trim() || '',
+        charge:          row[3]?.trim() || '',
+        tauxRealisation: row[5]?.trim() || '',
+        evaluation:      row[6]?.trim() || '',
+      });
+    });
+  });
+  return actions.slice(0, 20);
+}
+
+function extractAnnexe6(tables) {
+  const domaines = [];
+  tables.forEach(table => {
+    if (table.length < 4) return;
+    const flat = table.map(r => r.join(' ').toLowerCase()).join(' ');
+    if (!flat.includes('domaine') || !flat.includes('valeur') || !flat.includes('mesures')) return;
+    let currentDomain = '';
+    table.slice(1).forEach(row => {
+      const domain   = row[0]?.trim();
+      const critere  = row[1]?.trim();
+      const valeur   = row[2]?.trim();
+      const comment  = row[3]?.trim();
+      if (domain && domain !== '…') currentDomain = domain;
+      if (!critere || critere === '…') return;
+      domaines.push({
+        domaine:    currentDomain,
+        critere,
+        valeur:     valeur || '',
+        commentaire: comment || '',
+      });
+    });
+  });
+  return domaines.slice(0, 40);
+}
+
+function extractAnnexe8(text, tables) {
+  const vulns = [];
+
+  const refMatches = [...text.matchAll(/r[eé]f[eé]rence de la vuln[eé]rabilit[eé]\s*:\s*([^\n]+)/gi)];
+  refMatches.forEach(m => {
+    const ref = m[1]?.trim();
+    if (ref && ref.length > 1) {
+      const snippet  = text.slice(m.index, m.index + 600);
+      const desc     = snippet.match(/description\s*:\s*([^\n]+)/i)?.[1]?.trim() || '';
+      const criticite= snippet.match(/criticit[eé]\s*:\s*([^\n]+)/i)?.[1]?.trim() || '';
+      const reco     = snippet.match(/recommandation\s*:\s*([^\n]+)/i)?.[1]?.trim() || '';
+      vulns.push({ ref, desc, criticite, reco, source: 'bloc' });
+    }
+  });
+
+  if (tables) {
+    tables.forEach(table => {
+      if (table.length < 2) return;
+      const header = (table[0] || []).map(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+      const hasRef    = header.some(h => h.includes('reference'));
+      const hasImpact = header.some(h => h.includes('impact') || h.includes('actifs') || h.includes('recommandation'));
+      if (!hasRef || !hasImpact) return;
+
+      const iVuln  = header.findIndex(h => h.includes('vulnerabilite') || h.includes('vulnerabilit'));
+      const iRef   = header.findIndex(h => h.includes('reference'));
+      const iActif = header.findIndex(h => h.includes('actifs') || h.includes('composante'));
+      const iImpact= header.findIndex(h => h.includes('impact'));
+      const iProba = header.findIndex(h => h.includes('probabilit'));
+      const iReco  = header.findIndex(h => h.includes('recommandation'));
+
+      table.slice(1).forEach(row => {
+        const ref  = iRef  >= 0 ? row[iRef]?.trim()  : '';
+        const vuln = iVuln >= 0 ? row[iVuln]?.trim() : '';
+        if (!ref && !vuln) return;
+        const refLower = ref?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        if (refLower === 'reference') return;
+        vulns.push({
+          ref:       ref || vuln || 'N/A',
+          desc:      iVuln   >= 0 ? (row[iVuln]?.trim()  || '') : '',
+          criticite: iProba  >= 0 ? (row[iProba]?.trim() || '') : '',
+          actifs:    iActif  >= 0 ? (row[iActif]?.trim() || '') : '',
+          impact:    iImpact >= 0 ? (row[iImpact]?.trim()|| '') : '',
+          reco:      iReco   >= 0 ? (row[iReco]?.trim()  || '') : '',
+          source: 'tableau',
+        });
+      });
+    });
+  }
+
+  return vulns.filter(v => v.ref).slice(0, 10);
+}
+
+function extractAnnexe9(tables) {
+  const actions = [];
+  tables.forEach(table => {
+    if (table.length < 3) return;
+    const flat = table.map(r => r.join(' ').toLowerCase()).join(' ');
+    if (!flat.includes('projet') || !flat.includes('action') || (!flat.includes('délai') && !flat.includes('delai') && !flat.includes('h/j'))) return;
+    let currentProject = '';
+    table.slice(1).forEach(row => {
+      const proj   = row[0]?.trim();
+      const action = row[1]?.trim();
+      if (proj && proj !== '…') currentProject = proj;
+      if (!action || action === '…') return;
+      actions.push({
+        projet:    currentProject,
+        action,
+        criticite: row[2]?.trim() || '',
+        charge:    row[3]?.trim() || '',
+        charge_hj: row[4]?.trim() || '',
+        delai:     row[5]?.trim() || row[6]?.trim() || '',
+      });
+    });
+  });
+  return actions.slice(0, 20);
 }
 
 function findHeader(table, requiredKeywords) {
@@ -308,16 +608,24 @@ function extractNetworkFromTable(tables) {
   return network.filter(n => n.nature).slice(0, 15);
 }
 
+// ══════════════════════════════════════════════
+// extractIndicateurs — IMPROVED header detection
+// Now recognises "Classe / Indicateur | Indicateur | Valeur"
+// AND alternate structures with "mesure", "classe", etc.
+// ══════════════════════════════════════════════
 function extractIndicateurs(tables) {
   const indicators = [];
   let currentClass = '';
   tables.forEach(table => {
-    if (table.length < 5) return;
+    if (table.length < 3) return;
     let headerRow = null;
     let dataStart = 1;
-    for (let ri = 0; ri <= 1; ri++) {
-      const h = (table[ri] || []).map(c => c.toLowerCase());
-      if (h.some(c => c.includes('indicateur')) && h.some(c => c.includes('valeur'))) {
+    for (let ri = 0; ri <= 2; ri++) {
+      const h = (table[ri] || []).map(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+      const hasIndicateur = h.some(c => c.includes('indicateur') || c.includes('classe'));
+      const hasValeur     = h.some(c => c.includes('valeur'));
+      const hasMesure     = h.some(c => c.includes('mesure'));
+      if ((hasIndicateur && hasValeur) || (hasMesure && hasValeur)) {
         headerRow = h;
         dataStart = ri + 1;
         break;
@@ -325,7 +633,7 @@ function extractIndicateurs(tables) {
     }
     if (!headerRow) return;
     const iClasse = headerRow.findIndex(h => h.includes('classe'));
-    const iInd    = headerRow.findIndex(h => h.includes('indicateur') && !h.includes('classe'));
+    const iInd    = headerRow.findIndex(h => (h.includes('indicateur') && !h.includes('classe')) || h.includes('mesure'));
     const iVal    = headerRow.findIndex(h => h.includes('valeur'));
     const iCom    = headerRow.findIndex(h => h.includes('commentaire'));
     const iIndFinal    = iInd >= 0 ? iInd : 1;
@@ -456,37 +764,87 @@ const STEPS = [
   "Lecture du fichier…",
   "Extraction du texte…",
   "Vérification Annexe 1 (Identification)…",
+  "Vérification Annexe 2 (Processus DIC)…",
   "Vérification Annexe 3 (Système d'Information)…",
-  "Vérification Annexe 7 (Indicateurs)…",
-  "Extraction des données…",
+  "Vérification Annexes 4 & 5 (Planning & Plan préc.)…",
+  "Vérification Annexe 6 (Maturité)…",
+  "Vérification Annexe 7 (Indicateurs — valeurs)…",
+  "Vérification Annexes 8 & 9 (Vulnérabilités & Plan action)…",
   "Calcul score final…",
 ];
 
-function validateContent(text) {
+// ══════════════════════════════════════════════
+// CORE FIX: validateContent now checks Annexe 7
+// by VALUE presence, not just keyword presence.
+// ══════════════════════════════════════════════
+function validateContent(text, indicators) {
   const lower     = text.toLowerCase();
   const wordCount = lower.split(/\s+/).filter(w => w.length > 3).length;
   if (wordCount < 50) {
     return { isEmpty:true, results:[], wordCount, errors:[`Document insuffisant — ${wordCount} mots. Minimum 50 requis.`], score:0, isValid:false };
   }
+
   const results = ANNEXES.map(annexe => {
-    const subResults = annexe.subChecks.map(sub => ({ ...sub, found: sub.keywords.some(kw => lower.includes(kw.toLowerCase())) }));
+    // ── Special case: Annexe 7 checks REAL extracted values ──
+    if (annexe.key === 'annexe7') {
+      const subResults = annexe.subChecks.map(sub => {
+        // For each subCheck, see if a matching indicator row has a non-empty value
+        const matchingIndicator = indicators.find(ind =>
+          sub.keywords.some(kw =>
+            ind.indicateur.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+              .includes(kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))
+          )
+        );
+        if (!matchingIndicator) {
+          // Row not found at all — keyword not even in table
+          return { ...sub, found: false, reason: 'non_trouvé' };
+        }
+        const val = (matchingIndicator.valeur || '').trim();
+        const isEmpty = !val || val === '' || val === '-' || val === '—'
+          || val === '…' || val.toLowerCase() === 'null' || val.toLowerCase() === 'n/a';
+        return {
+          ...sub,
+          found: !isEmpty,
+          valeur: val,
+          reason: isEmpty ? 'valeur_vide' : 'ok',
+        };
+      });
+      const foundCount = subResults.filter(s => s.found).length;
+      return { ...annexe, found: foundCount >= annexe.minSubChecks, subResults, foundCount };
+    }
+
+    // ── All other annexes: keyword detection as before ──
+    const subResults = annexe.subChecks.map(sub => ({
+      ...sub,
+      found: sub.keywords.some(kw => lower.includes(kw.toLowerCase())),
+    }));
     const foundCount = subResults.filter(s => s.found).length;
     return { ...annexe, found: foundCount >= annexe.minSubChecks, subResults, foundCount };
   });
+
   const presentCount = results.filter(r => r.found).length;
   const score = Math.round((presentCount / ANNEXES.length) * 100);
   const errors = results.filter(r => !r.found).map(r => {
-    const missing = r.subResults.filter(s => !s.found).map(s => s.label);
+    const missing = r.subResults.filter(s => !s.found).map(s => {
+      if (s.reason === 'valeur_vide') return `${s.label} (ligne présente mais valeur vide)`;
+      if (s.reason === 'non_trouvé') return `${s.label} (non trouvé)`;
+      return s.label;
+    });
     return `${r.label} — ${r.foundCount}/${r.subChecks.length} sections (min ${r.minSubChecks}). Manquants: ${missing.join(', ')}`;
   });
   return { isEmpty:false, results, errors, score, isValid:errors.length===0, wordCount };
 }
 
-function buildAnnexeStatus(tables, text) {
+// ══════════════════════════════════════════════
+// buildAnnexeStatus — Annexe 7 now uses
+// checkIndicatorValue() to validate each expected
+// indicator has an actual filled value.
+// ══════════════════════════════════════════════
+function buildAnnexeStatus(tables, text, indicators) {
   const lower = text.toLowerCase();
   const status = {};
-  
-  // Annexe 1 status
+
+  // Annexe 1
   const annexe1Data = extractAnnexe1(tables);
   const annexe1FilledCount = Object.values(annexe1Data).filter(v => v && v.trim().length > 0).length;
   status.annexe1 = {
@@ -494,8 +852,17 @@ function buildAnnexeStatus(tables, text) {
     title: 'Identification de l\'Organisme',
     row_count: annexe1FilledCount,
   };
-  
-  // Annexe 3 status
+
+  // Annexe 2
+  const processes = extractAnnexe2(tables);
+  const dicFilled = processes.filter(p => p.confidentialite || p.integrite || p.disponibilite).length;
+  status.annexe2 = {
+    status: dicFilled >= 1 ? 'filled' : (processes.length > 0 ? 'partial' : 'empty'),
+    title: 'Cartographie des Processus (DIC)',
+    row_count: processes.length,
+  };
+
+  // Annexe 3
   const servers = extractServersFromTable(tables);
   const apps = extractAppsFromTable(tables);
   const network = extractNetworkFromTable(tables);
@@ -505,33 +872,114 @@ function buildAnnexeStatus(tables, text) {
     title: 'Description du Système d\'Information',
     row_count: servers.length + apps.length + network.length,
   };
-  
-  // Annexe 7 status
-  const indicators = extractIndicateurs(tables);
-  const validIndicators = indicators.filter(ind => !isHeaderRow(ind));
-  const annexe7FilledCount = validIndicators.length;
-  status.annexe7 = {
-    status: annexe7FilledCount >= 10 ? 'filled' : (annexe7FilledCount >= 3 ? 'partial' : 'empty'),
-    title: 'Indicateurs de Sécurité',
-    row_count: annexe7FilledCount,
+
+  // Annexe 4
+  const phases = extractAnnexe4(tables);
+  const hasAnnexe4Text = lower.includes('phase 1') || lower.includes('planning') || lower.includes('h/j');
+  status.annexe4 = {
+    status: phases.length >= 2 ? 'filled' : (phases.length > 0 || hasAnnexe4Text ? 'partial' : 'empty'),
+    title: 'Planning d\'Exécution Réel',
+    row_count: phases.reduce((acc, p) => acc + p.steps.length, 0),
   };
-  
+
+  // Annexe 5
+  const prevActions = extractAnnexe5(tables);
+  const hasTaux = lower.includes('taux de réalisation') || lower.includes('taux de realisation');
+  status.annexe5 = {
+    status: prevActions.length >= 2 ? 'filled' : (prevActions.length > 0 || hasTaux ? 'partial' : 'empty'),
+    title: 'Évaluation du Plan d\'Action Précédent',
+    row_count: prevActions.length,
+  };
+
+  // Annexe 6
+  const maturite = extractAnnexe6(tables);
+  const maturiteFilled = maturite.filter(m => m.valeur && m.valeur.trim() !== '').length;
+  status.annexe6 = {
+    status: maturiteFilled >= 5 ? 'filled' : (maturite.length > 0 ? 'partial' : 'empty'),
+    title: 'État de Maturité de la Sécurité du SI',
+    row_count: maturite.length,
+  };
+
+  // ── ANNEXE 7: VALUE-BASED validation ──
+  // Each expected indicator is checked for a non-empty valeur.
+  const annexe7Results = ANNEXE7_EXPECTED.map(exp => {
+    const result = checkIndicatorValue(indicators, exp.keywords);
+    return {
+      label:    exp.label,
+      key:      exp.key,
+      found:    result.found,
+      hasValue: result.hasValue,
+      valeur:   result.valeur,
+      // Status: 'ok' | 'vide' | 'absent'
+      status:   !result.found ? 'absent' : (!result.hasValue ? 'vide' : 'ok'),
+    };
+  });
+
+  const filledCount   = annexe7Results.filter(r => r.status === 'ok').length;
+  const emptyValCount = annexe7Results.filter(r => r.status === 'vide').length;
+  const absentCount   = annexe7Results.filter(r => r.status === 'absent').length;
+  const totalExpected = ANNEXE7_EXPECTED.length;
+
+  const annexe7StatusLabel =
+    filledCount >= Math.floor(totalExpected * 0.8)
+      ? 'filled'
+      : filledCount >= Math.floor(totalExpected * 0.4)
+        ? 'partial'
+        : 'empty';
+
+  status.annexe7 = {
+    status:         annexe7StatusLabel,
+    title:          'Indicateurs de Sécurité',
+    row_count:      filledCount,
+    total_expected: totalExpected,
+    filled_count:   filledCount,
+    empty_val_count: emptyValCount,
+    absent_count:   absentCount,
+    // Detailed per-indicator results for the UI
+    indicator_results: annexe7Results,
+  };
+
+  // Annexe 8
+  const vulns = extractAnnexe8(text, tables);
+  const hasVulnKeywords = lower.includes('vuln') && (lower.includes('recommandation') || lower.includes('impact') || lower.includes('référence'));
+  status.annexe8 = {
+    status: vulns.length >= 1 ? 'filled' : (hasVulnKeywords ? 'partial' : 'empty'),
+    title: 'Vulnérabilités Très Critiques',
+    row_count: vulns.length,
+    optional: true,
+  };
+
+  // Annexe 9
+  const actionPlan = extractAnnexe9(tables);
+  const hasPlanKeywords = lower.includes('plan d\'action') && (lower.includes('délai') || lower.includes('h/j'));
+  status.annexe9 = {
+    status: actionPlan.length >= 2 ? 'filled' : (actionPlan.length > 0 || hasPlanKeywords ? 'partial' : 'empty'),
+    title: 'Plan d\'Action Proposé',
+    row_count: actionPlan.length,
+  };
+
   return status;
 }
 
 function buildExtractedData(validation, user, text, html) {
   const { score } = validation;
-  const tables       = html ? parseHtmlTables(html) : [];
-  const annexe1Data  = extractAnnexe1(tables);
-  const servers      = extractServersFromTable(tables);
-  const apps         = extractAppsFromTable(tables);
-  const network      = extractNetworkFromTable(tables);
-  const indicators   = extractIndicateurs(tables);
-  const realScore    = calcScoreFromIndicateurs(indicators) ?? score;
-  const radar        = buildRadarFromIndicateurs(indicators, realScore);
-  const risques      = buildRisquesFromIndicateurs(indicators, realScore);
-  const present      = validation.results.filter(r => r.found).length;
-  const total        = ANNEXES.length;
+  const tables        = html ? parseHtmlTables(html) : [];
+  const annexe1Data   = extractAnnexe1(tables);
+  const servers       = extractServersFromTable(tables);
+  const apps          = extractAppsFromTable(tables);
+  const network       = extractNetworkFromTable(tables);
+  const indicators    = extractIndicateurs(tables);
+  const processes     = extractAnnexe2(tables);
+  const phases        = extractAnnexe4(tables);
+  const prevActions   = extractAnnexe5(tables);
+  const maturite      = extractAnnexe6(tables);
+  const vulns         = extractAnnexe8(text, tables);
+  const actionPlan    = extractAnnexe9(tables);
+  const realScore     = calcScoreFromIndicateurs(indicators) ?? score;
+  const radar         = buildRadarFromIndicateurs(indicators, realScore);
+  const risques       = buildRisquesFromIndicateurs(indicators, realScore);
+  const present       = validation.results.filter(r => r.found).length;
+  const total         = ANNEXES.length;
   const hasRssi = indicators.some(i => i.indicateur.toLowerCase().includes('rssi') && /oui|existant|yes/i.test(i.valeur));
   const hasPssi = indicators.some(i => i.indicateur.toLowerCase().includes('pssi') && /oui|existant|yes/i.test(i.valeur));
   const hasPca  = indicators.some(i => i.indicateur.toLowerCase().includes('pca')  && /oui|existant|yes/i.test(i.valeur));
@@ -540,10 +988,9 @@ function buildExtractedData(validation, user, text, html) {
   const partielInd  = indicators.filter(i => /partiel|en cours|prévu/i.test(i.valeur)).length;
   const nonConfInd  = indicators.filter(i => /^(non|absent|inexistant|0)/i.test(i.valeur)).length;
   const totalInd    = indicators.length;
-  
-  // Build annexe_status
-  const annexe_status = buildAnnexeStatus(tables, text);
-  
+
+  const annexe_status = buildAnnexeStatus(tables, text, indicators);
+
   return {
     company: {
       name:             annexe1Data.companyName || user?.company_name || 'Non renseigné',
@@ -574,13 +1021,19 @@ function buildExtractedData(validation, user, text, html) {
       partiel:     totalInd > 0 ? partielInd  : Math.max(total-present-1, 0),
       nonConforme: totalInd > 0 ? nonConfInd  : total - present,
     },
-    radarMaturite:     radar,
-    serveursListe:     servers,
-    applicationsListe: apps,
-    reseauListe:       network,
-    risquesListe:      risques,
+    radarMaturite:      radar,
+    serveursListe:      servers,
+    applicationsListe:  apps,
+    reseauListe:        network,
+    risquesListe:       risques,
     indicators,
-    annexe_status,     // <-- ADDED HERE
+    processusListe:     processes,
+    planningPhases:     phases,
+    prevActionsListe:   prevActions,
+    maturiteListe:      maturite,
+    vulnsCritiques:     vulns,
+    planActionListe:    actionPlan,
+    annexe_status,
   };
 }
 
@@ -603,6 +1056,7 @@ export default function AuditForm() {
   const [apiError,     setApiError]     = useState('');
   const [expanded,     setExpanded]     = useState(null);
   const [extracted,    setExtracted]    = useState(null);
+  const [openAnnexe,   setOpenAnnexe]   = useState(null);
 
   useEffect(() => {
     inject();
@@ -617,27 +1071,35 @@ export default function AuditForm() {
     if (!['pdf','docx'].includes(ext)) { alert('Format non supporté. Utilisez PDF ou DOCX.'); return; }
     setFile(f); setStatus('idle'); setProgress(0);
     setErrors([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null); setExtracted(null);
+    setOpenAnnexe(null);
   };
 
   const handleVerify = async () => {
     if (!file || status === 'loading') return;
     setStatus('loading'); setProgress(0); setStepIdx(0); setApiError('');
     try {
-      setStepIdx(0); setProgress(10);
+      setStepIdx(0); setProgress(8);
       const { text, html } = await readFileContent(file);
-      setStepIdx(1); setProgress(22);
+      setStepIdx(1); setProgress(16);
       await new Promise(r => setTimeout(r, 200));
       if (!text || text.trim().length === 0) {
         setErrors(['Fichier vide — aucun texte extrait. Le fichier est peut-être corrompu ou scanné sans OCR.']);
         setStatus('fail'); return;
       }
-      for (let i = 2; i <= 5; i++) {
-        setStepIdx(i); setProgress(22 + i * 15);
-        await new Promise(r => setTimeout(r, 350));
+
+      // Extract indicators BEFORE validation so Annexe 7 can use real values
+      const tables     = html ? parseHtmlTables(html) : [];
+      const indicators = extractIndicateurs(tables);
+
+      for (let i = 2; i <= 8; i++) {
+        setStepIdx(i); setProgress(16 + i * 10);
+        await new Promise(r => setTimeout(r, 280));
       }
-      setStepIdx(6); setProgress(97);
+      setStepIdx(9); setProgress(96);
       await new Promise(r => setTimeout(r, 250));
-      const validation = validateContent(text);
+
+      // Pass indicators to validateContent for Annexe 7 value-check
+      const validation = validateContent(text, indicators);
       setCheckResults(validation.results);
       setScore(validation.score);
       setWordCount(validation.wordCount || 0);
@@ -646,9 +1108,9 @@ export default function AuditForm() {
         setErrors(validation.errors);
         setStatus('fail'); return;
       }
-      const extracted =buildExtractedData(validation, user, text, html);
-      setExtracted(extracted);
-      localStorage.setItem('extractedData', JSON.stringify(extracted));
+      const extractedData = buildExtractedData(validation, user, text, html);
+      setExtracted(extractedData);
+      localStorage.setItem('extractedData', JSON.stringify(extractedData));
       const token = localStorage.getItem('token');
       if (token) {
         setStatus('saving');
@@ -656,15 +1118,14 @@ export default function AuditForm() {
           const formData = new FormData();
           formData.append('report', file);
           formData.append('compliance_score', validation.score);
-          formData.append('organism_name',   extracted.company?.name   || '');
-          formData.append('organism_sector', extracted.company?.sector || '');
+          formData.append('organism_name',   extractedData.company?.name   || '');
+          formData.append('organism_sector', extractedData.company?.sector || '');
           formData.append('is_compliant',    validation.score >= 75);
-          formData.append('maturity_level',  extracted.company?.maturity_level || 1);
-          formData.append('has_rssi',        extracted.company?.has_rssi || false);
-          formData.append('has_pssi',        extracted.company?.has_pssi || false);
-          formData.append('has_pca',         extracted.company?.has_pca  || false);
-          formData.append('has_pra',         extracted.company?.has_pra  || false);
-
+          formData.append('maturity_level',  extractedData.company?.maturity_level || 1);
+          formData.append('has_rssi',        extractedData.company?.has_rssi || false);
+          formData.append('has_pssi',        extractedData.company?.has_pssi || false);
+          formData.append('has_pca',         extractedData.company?.has_pca  || false);
+          formData.append('has_pra',         extractedData.company?.has_pra  || false);
           await API.post('/reports/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           });
@@ -692,6 +1153,7 @@ export default function AuditForm() {
   const reset = () => {
     setFile(null); setStatus('idle'); setProgress(0);
     setErrors([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null); setExtracted(null);
+    setOpenAnnexe(null);
   };
 
   const onDragOver  = (e) => { e.preventDefault(); setDrag(true); };
@@ -710,6 +1172,106 @@ export default function AuditForm() {
     { to:'/client/contact',       label:'Contacter ANCS',     icon:'💬' },
   ];
 
+  // ── Helper: missing / empty fields per annexe ──
+  const getManquants = (key) => {
+    if (!extracted) return [];
+
+    if (key === 'annexe1') {
+      const c = extracted?.company || {};
+      const missing = [];
+      if (!c.name || c.name === 'Non renseigné') missing.push('Nom de l\'organisme');
+      if (!c.acronym) missing.push('Acronyme');
+      if (!c.statut) missing.push('Statut juridique');
+      if (!c.sector || c.sector === 'Non renseigné') missing.push('Secteur d\'activité');
+      if (!c.email) missing.push('Adresse email');
+      return missing.length ? missing : ['Aucun champ manquant (données partielles)'];
+    }
+    if (key === 'annexe2') {
+      return [
+        'Désignation des processus métier',
+        'Niveaux de Confidentialité (1–4)',
+        'Niveaux d\'Intégrité (1–4)',
+        'Niveaux de Disponibilité (1–4)',
+      ];
+    }
+    if (key === 'annexe3') {
+      const missing = [];
+      if (!extracted?.serveursListe?.length) missing.push('Serveurs');
+      if (!extracted?.applicationsListe?.length) missing.push('Applications');
+      if (!extracted?.reseauListe?.length) missing.push('Infrastructure réseau');
+      return missing.length ? missing : ['Aucun champ manquant (données partielles)'];
+    }
+    if (key === 'annexe4') {
+      return [
+        'Phases de la mission (Phase 1, Phase 2…)',
+        'Équipe intervenante (noms)',
+        'Dates de réalisation',
+        'Durée totale (Homme/jours)',
+      ];
+    }
+    if (key === 'annexe5') {
+      return [
+        'Projets et actions du plan précédent',
+        'Criticité de chaque action',
+        'Taux de réalisation',
+        'Évaluation des mesures adoptées',
+      ];
+    }
+    if (key === 'annexe6') {
+      return [
+        'Domaine 5 — Mesures organisationnelles (valeurs 0–5)',
+        'Domaine 6 — Mesures liées aux personnes (valeurs 0–5)',
+        'Domaine 7 — Mesures de sécurité physique (valeurs 0–5)',
+        'Domaine 8 — Mesures technologiques (valeurs 0–5)',
+      ];
+    }
+
+    // ── ANNEXE 7: show per-indicator status from indicator_results ──
+    if (key === 'annexe7') {
+      const annexe7Status = extracted?.annexe_status?.annexe7;
+      const indResults    = annexe7Status?.indicator_results || [];
+
+      if (indResults.length === 0) {
+        return ['Aucun indicateur extrait — tableau Annexe 7 non reconnu'];
+      }
+
+      return indResults
+        .filter(r => r.status !== 'ok')
+        .map(r => {
+          if (r.status === 'absent') return `❌ Non trouvé : ${r.label}`;
+          if (r.status === 'vide')   return `⚠️ Valeur vide : ${r.label}`;
+          return r.label;
+        });
+    }
+
+    if (key === 'annexe8') {
+      return [
+        'Référence de chaque vulnérabilité critique',
+        'Description de la vulnérabilité',
+        'Criticité (Très Critique / Critique)',
+        'Composante(s) du SI impactée(s)',
+        'Recommandation associée',
+      ];
+    }
+    if (key === 'annexe9') {
+      return [
+        'Projets et actions proposés',
+        'Criticité de chaque action',
+        'Charge estimée (Homme/jours)',
+        'Chargé de l\'action / Responsable',
+        'Délai / Échéance de mise en œuvre',
+      ];
+    }
+    return [];
+  };
+
+  // ── Annexe 7 badge shows filled/total ──
+  const getAnnexe7Badge = () => {
+    const a7 = extracted?.annexe_status?.annexe7;
+    if (!a7) return null;
+    return `${a7.filled_count}/${a7.total_expected} indicateurs renseignés`;
+  };
+
   return (
     <div className="af-root" style={{ minHeight:'100vh', background:BG, color:'#e2f0ff' }}>
 
@@ -723,36 +1285,26 @@ export default function AuditForm() {
         height:60, position:'sticky', top:0, zIndex:100,
         boxShadow:'0 4px 24px rgba(0,0,0,.35)',
       }}>
-        {/* Left: logo + nav links */}
         <div style={{ display:'flex', alignItems:'center', gap:24 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <div style={{ width:34, height:34, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🏢</div>
             <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:15, color:'#d4e8ff' }}>Espace Entreprise</span>
           </div>
-
-          {/* ✅ Nav links */}
           <div style={{ display:'flex', gap:4 }}>
             {NAV_LINKS.map(nl => {
               const isActive = location.pathname === nl.to;
               return (
-                <Link
-                  key={nl.to}
-                  to={nl.to}
-                  className="af-nav-link"
-                  style={{
-                    background: isActive ? 'rgba(99,210,190,.1)' : 'transparent',
-                    color:      isActive ? '#63d2be' : '#3d607a',
-                    border:     isActive ? '1px solid rgba(99,210,190,.2)' : '1px solid transparent',
-                  }}
-                >
+                <Link key={nl.to} to={nl.to} className="af-nav-link" style={{
+                  background: isActive ? 'rgba(99,210,190,.1)' : 'transparent',
+                  color:      isActive ? '#63d2be' : '#3d607a',
+                  border:     isActive ? '1px solid rgba(99,210,190,.2)' : '1px solid transparent',
+                }}>
                   <span style={{ fontSize:13 }}>{nl.icon}</span>{nl.label}
                 </Link>
               );
             })}
           </div>
         </div>
-
-        {/* Right: user + logout */}
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           {user && (
             <div style={{ display:'flex', alignItems:'center', gap:9, padding:'5px 12px', background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.07)', borderRadius:99 }}>
@@ -777,7 +1329,7 @@ export default function AuditForm() {
               <div style={{ width:50, height:50, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, boxShadow:'0 0 0 2px rgba(99,210,190,.22)' }}>📤</div>
               <div>
                 <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:18, fontWeight:800, color:'#e4f2ff', marginBottom:4 }}>Upload de rapport d'audit</h1>
-                <p style={{ fontSize:12, color:'#3d607a' }}>Modèle officiel ANCS · Annexes 1, 3 et 7 vérifiées</p>
+                <p style={{ fontSize:12, color:'#3d607a' }}>Modèle officiel ANCS · 9 Annexes vérifiées (Annexes 1 à 9)</p>
               </div>
             </div>
           </div>
@@ -852,7 +1404,20 @@ export default function AuditForm() {
                           {r.subResults.map((s,j) => (
                             <div key={j} className="af-sub-check">
                               <span style={{ fontSize:12 }}>{s.found?'✅':'❌'}</span>
-                              <span style={{ color:s.found?'#4a6a88':RED }}>{s.label}</span>
+                              <span style={{ color:s.found?'#4a6a88':RED }}>
+                                {s.label}
+                                {/* Show why it failed for Annexe 7 */}
+                                {s.reason === 'valeur_vide' && (
+                                  <span style={{ color:AMBER, fontSize:10, marginLeft:6 }}>
+                                    (ligne présente · valeur non renseignée)
+                                  </span>
+                                )}
+                                {s.reason === 'non_trouvé' && (
+                                  <span style={{ color:RED, fontSize:10, marginLeft:6 }}>
+                                    (indicateur absent du tableau)
+                                  </span>
+                                )}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -861,54 +1426,134 @@ export default function AuditForm() {
                   ))}
                 </div>
 
-                {/* ========== ANNEXE STATUS — NEW BLOCK ========== */}
+                {/* ANNEXE STATUS — ALL 9 */}
                 {extracted && extracted.annexe_status && (
-                  <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 14 }}>
-                    <div style={{ fontSize: 11, color: '#3d607a', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, marginBottom: 10 }}>
-                      État des annexes extraites
+                  <div style={{ marginTop:16, borderTop:'1px solid rgba(255,255,255,.08)', paddingTop:14 }}>
+                    <div style={{ fontSize:11, color:'#3d607a', textTransform:'uppercase', letterSpacing:'.5px', fontWeight:600, marginBottom:10 }}>
+                      État des 9 annexes extraites
                     </div>
                     {Object.entries(extracted.annexe_status || {}).map(([key, val]) => {
-                      const num      = key.replace('annexe', '');
-                      const isEmpty  = val.status === 'empty';
+                      const num       = key.replace('annexe', '');
+                      const isEmpty   = val.status === 'empty';
                       const isPartial = val.status === 'partial';
-                      const color    = isEmpty ? RED : isPartial ? AMBER : GREEN;
-                      const icon     = isEmpty ? '❌' : isPartial ? '⚠️' : '✅';
-                      const label    = isEmpty ? 'Vide' : isPartial ? 'Partiel' : 'Rempli';
+                      const isOpen    = openAnnexe === key;
+                      const color     = isEmpty ? RED : isPartial ? AMBER : GREEN;
+                      const icon      = isEmpty ? '❌' : isPartial ? '⚠️' : '✅';
+                      const label     = isEmpty ? 'Vide' : isPartial ? 'Partiel' : 'Rempli';
+                      const canExpand = isEmpty || isPartial;
+                      const manquants = getManquants(key);
+
+                      // Special row count display for Annexe 7
+                      const isAnnexe7 = key === 'annexe7';
+                      const a7badge   = isAnnexe7 ? getAnnexe7Badge() : null;
 
                       return (
-                        <div key={key} style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '7px 0',
-                          borderBottom: '1px solid rgba(255,255,255,.04)',
-                          fontSize: 12,
-                        }}>
-                          <span style={{ fontSize: 13, flexShrink: 0 }}>{icon}</span>
-                          <span style={{ color: '#8ab0c8', flex: 1 }}>
-                            Annexe {num}
-                            {val.title ? ` — ${val.title}` : ''}
-                          </span>
-                          <span style={{
-                            fontSize: 10, fontWeight: 700,
-                            color, background: `${color}15`,
-                            border: `1px solid ${color}30`,
-                            padding: '2px 8px', borderRadius: 99,
-                            textTransform: 'uppercase', letterSpacing: '.4px',
-                          }}>
-                            {label}
-                          </span>
-                          {val.row_count > 0 && (
-                            <span style={{ fontSize: 10, color: '#2a4a62' }}>{val.row_count} lignes</span>
-                          )}
-                          {isEmpty && (
-                            <span style={{ fontSize: 10, color: RED }}>⚠ Données manquantes</span>
+                        <div key={key}>
+                          <div
+                            style={{
+                              display:'flex', alignItems:'center', gap:10,
+                              padding:'7px 0',
+                              borderBottom:'1px solid rgba(255,255,255,.04)',
+                              fontSize:12,
+                              cursor: canExpand ? 'pointer' : 'default',
+                            }}
+                            onClick={() => canExpand && setOpenAnnexe(isOpen ? null : key)}
+                          >
+                            <span style={{ fontSize:13, flexShrink:0 }}>{icon}</span>
+                            <span style={{ color:'#8ab0c8', flex:1 }}>
+                              Annexe {num}{val.title ? ` — ${val.title}` : ''}
+                              {val.optional && <span style={{ fontSize:10, color:'#3d607a', marginLeft:6 }}>(optionnelle)</span>}
+                            </span>
+                            <span style={{
+                              fontSize:10, fontWeight:700, color,
+                              background:`${color}15`, border:`1px solid ${color}30`,
+                              padding:'2px 8px', borderRadius:99,
+                              textTransform:'uppercase', letterSpacing:'.4px',
+                            }}>
+                              {label}
+                            </span>
+                            {/* Annexe 7: show "X/30 indicateurs" instead of raw row count */}
+                            {isAnnexe7 && a7badge ? (
+                              <span style={{ fontSize:10, color: isEmpty || isPartial ? AMBER : '#2a4a62' }}>
+                                {a7badge}
+                              </span>
+                            ) : (
+                              val.row_count > 0 && (
+                                <span style={{ fontSize:10, color:'#2a4a62' }}>{val.row_count} lignes</span>
+                              )
+                            )}
+                            {canExpand && (
+                              <span style={{ fontSize:10, color }}>{isOpen ? '▲' : '▼'}</span>
+                            )}
+                          </div>
+
+                          {/* Detail panel */}
+                          {canExpand && isOpen && manquants.length > 0 && (
+                            <div style={{
+                              margin:'4px 0 8px 24px',
+                              padding:'12px 16px',
+                              background: isEmpty ? 'rgba(248,113,113,.05)' : 'rgba(251,191,36,.05)',
+                              border: `1px solid ${isEmpty ? 'rgba(248,113,113,.15)' : 'rgba(251,191,36,.15)'}`,
+                              borderRadius:12,
+                              fontSize:12,
+                            }}>
+                              <div style={{ color, fontWeight:600, marginBottom:8 }}>
+                                {isEmpty ? 'Champs manquants :' : 'Champs à compléter :'}
+                              </div>
+                              {manquants.map((champ, ci) => {
+                                const isAbsent   = champ.startsWith('❌');
+                                const isEmptyVal = champ.startsWith('⚠️');
+                                const itemColor  = isAbsent ? RED : isEmptyVal ? AMBER : color;
+                                const cleanLabel = champ.replace(/^[❌⚠️]\s*/, '').replace(/^(Non trouvé|Valeur vide)\s*:\s*/, '');
+                                return (
+                                  <div key={ci} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'4px 0', color:'#8ab0c8', lineHeight:1.4 }}>
+                                    <span style={{ color:itemColor, flexShrink:0, marginTop:1 }}>
+                                      {isAbsent ? '❌' : isEmptyVal ? '⚠️' : isEmpty ? '❌' : '⚠️'}
+                                    </span>
+                                    <span style={{ color: isAbsent ? '#c87070' : isEmptyVal ? '#c8a040' : '#8ab0c8' }}>
+                                      {isEmptyVal
+                                        ? <><span style={{ color:AMBER, fontWeight:600 }}>Valeur vide :</span> {cleanLabel}</>
+                                        : isAbsent
+                                          ? <><span style={{ color:RED, fontWeight:600 }}>Non trouvé :</span> {cleanLabel}</>
+                                          : champ
+                                      }
+                                    </span>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Annexe 7 summary bar */}
+                              {isAnnexe7 && extracted?.annexe_status?.annexe7 && (
+                                <div style={{ marginTop:12, paddingTop:10, borderTop:'1px solid rgba(255,255,255,.06)' }}>
+                                  {(() => {
+                                    const a7 = extracted.annexe_status.annexe7;
+                                    const pct = Math.round((a7.filled_count / a7.total_expected) * 100);
+                                    return (
+                                      <>
+                                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#4a6a88', marginBottom:5 }}>
+                                          <span>Indicateurs renseignés</span>
+                                          <span style={{ color, fontWeight:700 }}>{a7.filled_count} / {a7.total_expected} ({pct}%)</span>
+                                        </div>
+                                        <div style={{ height:5, background:'rgba(255,255,255,.06)', borderRadius:99, overflow:'hidden' }}>
+                                          <div style={{ width:`${pct}%`, height:'100%', background:`linear-gradient(90deg,${color}88,${color})`, borderRadius:99, transition:'width .4s' }} />
+                                        </div>
+                                        <div style={{ display:'flex', gap:16, marginTop:7, fontSize:10 }}>
+                                          <span style={{ color:GREEN }}>✅ {a7.filled_count} renseignés</span>
+                                          <span style={{ color:AMBER }}>⚠️ {a7.empty_val_count} valeurs vides</span>
+                                          <span style={{ color:RED }}>❌ {a7.absent_count} absents</span>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       );
                     })}
                   </div>
                 )}
-                {/* ========== END ANNEXE STATUS ========== */}
-
               </div>
             )}
 
@@ -937,7 +1582,19 @@ export default function AuditForm() {
                             {r.subResults.map((s,j) => (
                               <div key={j} className="af-sub-check">
                                 <span style={{ fontSize:12 }}>{s.found?'✅':'❌'}</span>
-                                <span style={{ color:s.found?'#4a6a88':RED }}>{s.label}</span>
+                                <span style={{ color:s.found?'#4a6a88':RED }}>
+                                  {s.label}
+                                  {s.reason === 'valeur_vide' && (
+                                    <span style={{ color:AMBER, fontSize:10, marginLeft:6 }}>
+                                      (ligne présente · valeur non renseignée)
+                                    </span>
+                                  )}
+                                  {s.reason === 'non_trouvé' && (
+                                    <span style={{ color:RED, fontSize:10, marginLeft:6 }}>
+                                      (indicateur absent du tableau)
+                                    </span>
+                                  )}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -952,7 +1609,7 @@ export default function AuditForm() {
                   </div>
                 ))}
                 <div style={{ fontSize:11, color:'#3d607a', marginTop:10 }}>
-                  Complétez les sections manquantes en utilisant le modèle officiel ANCS (Annexes 1, 3 et 7).
+                  Complétez les sections manquantes en utilisant le modèle officiel ANCS (Annexes 1 à 9).
                 </div>
               </div>
             )}
@@ -961,7 +1618,7 @@ export default function AuditForm() {
               <button className="af-btn-verify" onClick={handleVerify} disabled={!file||status==='loading'}>
                 {status==='loading'
                   ? <><span style={{ width:16, height:16, border:'2px solid rgba(7,17,30,.2)', borderTop:'2px solid #07111e', borderRadius:'50%', animation:'af-spin 1s linear infinite', flexShrink:0 }} />Analyse en cours...</>
-                  : <>🔍 Vérifier la conformité</>}
+                  : <>🔍 Vérifier la conformité (9 Annexes)</>}
               </button>
             )}
           </div>
@@ -975,7 +1632,7 @@ export default function AuditForm() {
 
           {/* INFO */}
           <div className="af-anim" style={{ marginTop:14, background:CARD, border:`1px solid ${BDR}`, borderRadius:16, padding:'13px 20px', display:'flex', gap:16, justifyContent:'center', flexWrap:'wrap' }}>
-            {[{i:'📎',t:'PDF ou DOCX'},{i:'🔍',t:'Contenu réel analysé'},{i:'📋',t:'Annexes 1, 3 & 7'},{i:'📡',t:'Transmis à l\'ANCS'}].map(({i,t}) => (
+            {[{i:'📎',t:'PDF ou DOCX'},{i:'🔍',t:'Contenu réel analysé'},{i:'📋',t:'9 Annexes vérifiées'},{i:'📡',t:'Transmis à l\'ANCS'}].map(({i,t}) => (
               <div key={t} style={{ display:'flex', alignItems:'center', gap:7 }}>
                 <span>{i}</span><span style={{ fontSize:12, color:'#3d607a' }}>{t}</span>
               </div>

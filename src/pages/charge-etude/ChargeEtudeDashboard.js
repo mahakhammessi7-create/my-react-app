@@ -85,6 +85,30 @@ const CSS = `
     color: #cbd5e1;
   }
 
+  .ce-user-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 20px;
+    font-size: 12px;
+  }
+
+  .ce-user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
   .ce-logout-btn {
     padding: 8px 16px;
     background: rgba(139, 92, 246, 0.1);
@@ -162,12 +186,19 @@ const CSS = `
     border-radius: 12px;
     padding: 16px;
     transition: all 0.2s;
+    cursor: pointer;
   }
 
   .ce-assignment-card:hover {
     border-color: rgba(139, 92, 246, 0.3);
     background: rgba(255, 255, 255, 0.08);
     transform: translateY(-2px);
+  }
+
+  .ce-assignment-card.selected {
+    border-color: rgba(139, 92, 246, 0.5);
+    background: rgba(139, 92, 246, 0.1);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
   }
 
   .ce-assignment-header {
@@ -209,6 +240,12 @@ const CSS = `
     border: 1px solid rgba(239, 68, 68, 0.3);
   }
 
+  .ce-status-in-progress {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+
   .ce-assignment-org {
     font-size: 16px;
     font-weight: 600;
@@ -222,12 +259,27 @@ const CSS = `
     font-size: 12px;
     color: #94a3b8;
     margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ce-assignment-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ce-assignment-description {
+    font-size: 13px;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+    line-height: 1.5;
   }
 
   .ce-assignment-actions {
     display: flex;
     gap: 12px;
     margin-top: 12px;
+    flex-wrap: wrap;
   }
 
   .ce-validate-btn {
@@ -248,6 +300,28 @@ const CSS = `
   }
 
   .ce-validate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ce-start-analysis-btn {
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .ce-start-analysis-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .ce-start-analysis-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
@@ -299,6 +373,120 @@ const CSS = `
     background: #ef4444;
   }
 
+  .ce-toast.info {
+    background: #3b82f6;
+  }
+
+  .ce-filter-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .ce-filter-tab {
+    padding: 8px 16px;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 8px;
+    color: #c4b5fd;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .ce-filter-tab:hover {
+    background: rgba(139, 92, 246, 0.2);
+  }
+
+  .ce-filter-tab.active {
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    border-color: rgba(139, 92, 246, 0.8);
+    color: white;
+  }
+
+  .ce-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .ce-stat-card {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .ce-stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #8b5cf6;
+    margin-bottom: 4px;
+  }
+
+  .ce-stat-label {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
+  }
+
+  .ce-profile-section {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .ce-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .ce-profile-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 18px;
+  }
+
+  .ce-profile-info h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+
+  .ce-profile-info p {
+    font-size: 13px;
+    color: #94a3b8;
+  }
+
+  .ce-security-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 6px;
+    font-size: 11px;
+    color: #34d399;
+    font-weight: 600;
+  }
+
   @keyframes slideIn {
     from {
       transform: translateX(100%);
@@ -309,6 +497,19 @@ const CSS = `
       opacity: 1;
     }
   }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  .ce-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
 `;
 
 export default function ChargeEtudeDashboard() {
@@ -316,6 +517,9 @@ export default function ChargeEtudeDashboard() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [analysisInProgress, setAnalysisInProgress] = useState(null);
   const navigate = useNavigate();
 
   // Callback pour les nouvelles assignations
@@ -326,17 +530,15 @@ export default function ChargeEtudeDashboard() {
       priority: report.priority || 'Normale'
     });
     
-    // Jouer un son de notification
     try {
       const audio = new Audio('data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA==');
       audio.play().catch(() => {});
     } catch (e) {}
     
-    // Masquer la notification après 5 secondes
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Hook pour les rapports assignés à ce chargé d'étude
+  // Hook pour les rapports assignés à ce chargé d'étude (filtré par user.id)
   const { 
     reports: assignedReports, 
     loading: reportsLoading, 
@@ -351,7 +553,7 @@ export default function ChargeEtudeDashboard() {
   // Hook pour l'assignation (pour le responsable)
   const { assignReport, fetchChargesEtude, chargesEtude } = useAssignReport();
 
-  // Récupérer les infos utilisateur
+  // Récupérer et valider les infos utilisateur
   useEffect(() => {
     try {
       const userData = localStorage.getItem('user');
@@ -361,6 +563,8 @@ export default function ChargeEtudeDashboard() {
       }
 
       const u = JSON.parse(userData);
+      
+      // Vérifier que c'est un chargé d'étude
       const isChargeEtude = (role) => {
         const r = String(role || '').toLowerCase().trim();
         return r.includes('charge d\'étude') || r.includes('charge_etude') || r.includes('charge-etude') || r.includes('technical_review');
@@ -371,9 +575,17 @@ export default function ChargeEtudeDashboard() {
         return;
       }
 
+      // Vérifier que l'utilisateur a un ID valide
+      if (!u.id) {
+        console.error("User ID is missing");
+        localStorage.removeItem('user');
+        navigate('/charge-etude-login');
+        return;
+      }
+
       setUser(u);
-      
-      // Charger la liste des chargés d'étude (pour le responsable)
+console.log('👤 User connecté:', u);
+console.log('🆔 user.id:', u.id, '| type:', typeof u.id);
       fetchChargesEtude();
     } catch (err) {
       console.error("Dashboard init error:", err);
@@ -391,8 +603,8 @@ export default function ChargeEtudeDashboard() {
     navigate('/charge-etude-login');
   };
 
-  const showToast = (message, isError = false) => {
-    setToast({ message, isError });
+  const showToast = (message, isError = false, isInfo = false) => {
+    setToast({ message, isError, isInfo });
     setTimeout(() => setToast(null), 3000);
   };
 
@@ -409,34 +621,74 @@ export default function ChargeEtudeDashboard() {
   const handleRejectReport = async (reportId) => {
     const result = await rejectReportHook(reportId);
     if (result.success) {
-      showToast('Rapport rejeté', false);
+      showToast('Rapport rejeté avec succès !');
       refetch();
     } else {
       showToast(result.error || 'Erreur lors du rejet', true);
     }
   };
 
-  // Fonction d'assignation (pour la vue responsable)
-  const handleAssign = async (reportId, chargeId) => {
-    const { success, error } = await assignReport(reportId, chargeId);
-    if (success) {
-      showToast('Rapport assigné avec succès !');
-      refetch();
-    } else {
-      showToast(error || 'Erreur lors de l\'assignation', true);
+  // Fonction pour démarrer l'analyse
+  const handleStartAnalysis = async (reportId) => {
+    try {
+      setAnalysisInProgress(reportId);
+      showToast('Démarrage de l\'analyse...', false, true);
+      
+      // Appel API pour marquer le rapport comme "en cours d'analyse"
+      const response = await API.put(`/reports/${reportId}/status`, {
+        status: 'in_progress',
+        assigned_to: user?.id // Vérifier que le rapport appartient à cet utilisateur
+      });
+
+      if (response.status === 200 || response.status === 204) {
+        showToast('Analyse démarrée avec succès ! 🚀');
+        
+        setTimeout(() => {
+          navigate(`/charge-etude/analyse/${reportId}`, {
+            state: {
+              report: assignedReports.find(r => r.id === reportId)
+            }
+          });
+        }, 500);
+      }
+    } catch (err) {
+      console.error("Erreur au démarrage de l'analyse:", err);
+      showToast('Impossible de démarrer l\'analyse. Veuillez réessayer.', true);
+    } finally {
+      setAnalysisInProgress(null);
     }
+  };
+
+  // Filtrer les rapports selon le statut
+  const filteredReports = assignedReports?.filter(report => {
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'pending') return report.status === 'pending' || !report.status;
+    if (filterStatus === 'in_progress') return report.status === 'in_progress';
+    if (filterStatus === 'verified') return report.status === 'verified';
+    if (filterStatus === 'rejected') return report.status === 'rejected';
+    return true;
+  }) || [];
+
+  // Calculer les statistiques
+  const stats = {
+    total: assignedReports?.length || 0,
+    pending: assignedReports?.filter(r => r.status === 'pending' || !r.status).length || 0,
+    inProgress: assignedReports?.filter(r => r.status === 'in_progress').length || 0,
+    verified: assignedReports?.filter(r => r.status === 'verified').length || 0,
+    rejected: assignedReports?.filter(r => r.status === 'rejected').length || 0
+  };
+
+  // Extraire les initiales du nom pour l'avatar
+  const getInitials = (name) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   if (loading) {
     return (
       <div className="ce-dashboard">
         <style>{CSS}</style>
-        <div className="ce-nav">
-          <div className="ce-logo">📋 Charge d'Étude</div>
-        </div>
-        <div className="ce-container" style={{ textAlign: 'center', paddingTop: '100px' }}>
-          <p style={{ color: '#a5b4fc' }}>Chargement...</p>
-        </div>
+        <div className="ce-loading">Chargement du tableau de bord...</div>
       </div>
     );
   }
@@ -445,68 +697,45 @@ export default function ChargeEtudeDashboard() {
     <div className="ce-dashboard">
       <style>{CSS}</style>
 
-      {/* Toast Notification */}
+      {/* Notification */}
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+          color: 'white',
+          padding: '16px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+          zIndex: 1100,
+          animation: 'slideIn 0.3s ease'
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: '4px' }}>📬 Nouveau rapport assigné</div>
+          <div style={{ fontSize: '13px' }}>{notification.company}</div>
+        </div>
+      )}
+
+      {/* Toast */}
       {toast && (
-        <div className={`ce-toast ${toast.isError ? 'error' : ''}`}>
+        <div className={`ce-toast ${toast.isError ? 'error' : toast.isInfo ? 'info' : ''}`}>
           {toast.message}
         </div>
       )}
 
-      {/* Notification Popup for New Assignment */}
-      {notification && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-          color: 'white',
-          padding: '20px 24px',
-          borderRadius: '12px',
-          boxShadow: '0 10px 40px rgba(139, 92, 246, 0.3)',
-          zIndex: 2000,
-          animation: 'slideDown 0.4s ease',
-          maxWidth: '400px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ fontSize: '24px', marginTop: '2px' }}>🔔</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>
-                Nouveau rapport assigné !
-              </div>
-              <div style={{ fontSize: '13px', opacity: 0.9, marginBottom: '8px' }}>
-                {notification.company}
-              </div>
-              <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                Priorité: <strong>{notification.priority}</strong>
-              </div>
-            </div>
-          </div>
-          <style>{`
-            @keyframes slideDown {
-              from {
-                transform: translateY(-100%);
-                opacity: 0;
-              }
-              to {
-                transform: translateY(0);
-                opacity: 1;
-              }
-            }
-          `}</style>
-        </div>
-      )}
-
-      {/* Navigation Bar */}
+      {/* Navigation */}
       <nav className="ce-nav">
         <div className="ce-nav-left">
           <div className="ce-logo">📋 Charge d'Étude</div>
           <div className="ce-title-nav">Analyse Technique des Audits</div>
         </div>
         <div className="ce-nav-right">
-          <div className="ce-user-info">
-            <span>👤 {user?.username || user?.full_name || user?.email}</span>
+          <div className="ce-user-badge">
+            <div className="ce-user-avatar">{getInitials(user?.full_name)}</div>
+            <div>
+              <div style={{ fontWeight: 600 }}>{user?.full_name || user?.username}</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8' }}>{user?.email}</div>
+            </div>
           </div>
           <button className="ce-logout-btn" onClick={() => navigate('/charge-etude/profile')}>
             Mon profil
@@ -522,50 +751,173 @@ export default function ChargeEtudeDashboard() {
         <div className="ce-header">
           <h1 className="ce-header-title">🔍 Analyse Technique des Audits</h1>
           <p className="ce-header-subtitle">
-            Vérifiez et validez les données extraites des audits de conformité
+            Consultez vos rapports assignés et démarrez l'analyse de conformité
           </p>
         </div>
+
+        {/* Profil utilisateur sécurisé */}
+        <div className="ce-profile-section">
+          <div className="ce-profile-header">
+            <div className="ce-profile-avatar">{getInitials(user?.full_name)}</div>
+            <div className="ce-profile-info">
+              <h3>{user?.full_name || user?.username}</h3>
+              <p>Email: {user?.email}</p>
+              <p>Rôle: Chargé d'Étude</p>
+            </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <span className="ce-security-badge">🔒 Profil sécurisé</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Statistiques */}
+        {assignedReports && assignedReports.length > 0 && (
+          <div className="ce-stats">
+            <div className="ce-stat-card">
+              <div className="ce-stat-value">{stats.total}</div>
+              <div className="ce-stat-label">Rapports Total</div>
+            </div>
+            <div className="ce-stat-card">
+              <div className="ce-stat-value">{stats.pending}</div>
+              <div className="ce-stat-label">En Attente</div>
+            </div>
+            <div className="ce-stat-card">
+              <div className="ce-stat-value">{stats.inProgress}</div>
+              <div className="ce-stat-label">En Analyse</div>
+            </div>
+            <div className="ce-stat-card">
+              <div className="ce-stat-value">{stats.verified}</div>
+              <div className="ce-stat-label">Vérifiés</div>
+            </div>
+            <div className="ce-stat-card">
+              <div className="ce-stat-value">{stats.rejected}</div>
+              <div className="ce-stat-label">Rejetés</div>
+            </div>
+          </div>
+        )}
 
         {/* Rapports assignés à moi */}
         <div className="ce-section">
           <h2 className="ce-section-title">📋 Mes Rapports Assignés</h2>
           
+          {/* Filtres */}
+          {assignedReports && assignedReports.length > 0 && (
+            <div className="ce-filter-tabs">
+              <button 
+                className={`ce-filter-tab ${filterStatus === 'all' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('all')}
+              >
+                Tous ({stats.total})
+              </button>
+              <button 
+                className={`ce-filter-tab ${filterStatus === 'pending' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('pending')}
+              >
+                En Attente ({stats.pending})
+              </button>
+              <button 
+                className={`ce-filter-tab ${filterStatus === 'in_progress' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('in_progress')}
+              >
+                En Analyse ({stats.inProgress})
+              </button>
+              <button 
+                className={`ce-filter-tab ${filterStatus === 'verified' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('verified')}
+              >
+                Vérifiés ({stats.verified})
+              </button>
+              <button 
+                className={`ce-filter-tab ${filterStatus === 'rejected' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('rejected')}
+              >
+                Rejetés ({stats.rejected})
+              </button>
+            </div>
+          )}
+          
           {reportsLoading ? (
-            <div className="ce-loading">Chargement des rapports...</div>
-          ) : assignedReports && assignedReports.length > 0 ? (
+            <div className="ce-loading">Chargement de vos rapports assignés...</div>
+          ) : filteredReports && filteredReports.length > 0 ? (
             <div className="ce-assignment-list">
-              {assignedReports.map(report => (
-                <div key={report.id} className="ce-assignment-card">
+              {filteredReports.map(report => (
+                <div 
+                  key={report.id} 
+                  className={`ce-assignment-card ${selectedReport?.id === report.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedReport(report)}
+                >
                   <div className="ce-assignment-header">
                     <span className="ce-assignment-id">#{report.id}</span>
                     <span className={`ce-assignment-status ${
                       report.status === 'verified' ? 'ce-status-verified' :
-                      report.status === 'rejected' ? 'ce-status-rejected' : 
+                      report.status === 'rejected' ? 'ce-status-rejected' :
+                      report.status === 'in_progress' ? 'ce-status-in-progress' :
                       'ce-status-pending'
                     }`}>
                       {report.status === 'verified' ? '✓ Vérifié' :
-                       report.status === 'rejected' ? '✕ Rejeté' : 
+                       report.status === 'rejected' ? '✕ Rejeté' :
+                       report.status === 'in_progress' ? '⚙ En Analyse' :
                        '⏳ En attente'}
                     </span>
                   </div>
                   <div className="ce-assignment-org">
                     {report.organism_name || report.company_name || 'Organisme'}
                   </div>
+                  
+                  {report.description && (
+                    <div className="ce-assignment-description">
+                      {report.description}
+                    </div>
+                  )}
+                  
                   <div className="ce-assignment-meta">
-                    <span>📅 {new Date(report.created_at || report.upload_date).toLocaleDateString('fr-FR')}</span>
-                    <span>🎯 Priorité: {report.priority || 'Normale'}</span>
+                    <div className="ce-assignment-meta-item">
+                      <span>📅</span>
+                      <span>{new Date(report.created_at || report.upload_date).toLocaleDateString('fr-FR')}</span>
+                    </div>
+                    <div className="ce-assignment-meta-item">
+                      <span>🎯</span>
+                      <span>Priorité: {report.priority || 'Normale'}</span>
+                    </div>
+                    {report.audit_type && (
+                      <div className="ce-assignment-meta-item">
+                        <span>📊</span>
+                        <span>Type: {report.audit_type}</span>
+                      </div>
+                    )}
                   </div>
+                  
                   <div className="ce-assignment-actions">
+                    {report.status !== 'verified' && report.status !== 'rejected' && report.status !== 'in_progress' && (
+                      <button 
+                        className="ce-start-analysis-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartAnalysis(report.id);
+                        }}
+                        disabled={analysisInProgress === report.id}
+                      >
+                        {analysisInProgress === report.id ? '⏳ Démarrage...' : '🚀 Démarrer l\'analyse'}
+                      </button>
+                    )}
+                    
                     <button 
                       className="ce-validate-btn"
-                      onClick={() => handleValidateReport(report.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleValidateReport(report.id);
+                      }}
                       disabled={report.status === 'verified' || report.status === 'rejected'}
                     >
                       {report.status === 'verified' ? '✓ Déjà validé' : '✓ Valider le rapport'}
                     </button>
+                    
                     <button 
                       className="ce-reject-btn"
-                      onClick={() => handleRejectReport(report.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRejectReport(report.id);
+                      }}
                       disabled={report.status === 'verified' || report.status === 'rejected'}
                     >
                       {report.status === 'rejected' ? '✕ Rejeté' : '✕ Rejeter'}
@@ -576,60 +928,28 @@ export default function ChargeEtudeDashboard() {
             </div>
           ) : (
             <div className="ce-empty-state">
-              <p>Aucun rapport assigné pour le moment.</p>
-              <p style={{ fontSize: '13px', marginTop: '8px' }}>Les rapports vous seront assignés par le responsable.</p>
+              <p>
+                {filterStatus === 'all' 
+                  ? 'Aucun rapport assigné pour le moment.' 
+                  : `Aucun rapport avec le statut "${filterStatus}".`}
+              </p>
+              <p style={{ fontSize: '13px', marginTop: '8px' }}>
+                {filterStatus === 'all' && 'Les rapports vous seront assignés par le responsable.'}
+              </p>
             </div>
           )}
         </div>
 
         {/* Section d'examen technique */}
-        <div className="ce-section">
-          <h2 className="ce-section-title">🔬 Examen Technique Détaillé</h2>
-          <TechnicalReviewInterface 
-            reports={assignedReports}
-            onValidate={handleValidateReport}
-            onReject={handleRejectReport}
-          />
-        </div>
-
-        {/* Section des rapports en temps réel (optionnel - pour le responsable) */}
-        {user?.role === 'responsable' && (
+        {selectedReport && (
           <div className="ce-section">
-            <h2 className="ce-section-title">🔄 Rapports en temps réel</h2>
-            <div className="ce-assignment-list">
-              {realtimeReports.map(report => (
-                <div key={report.id} className="ce-assignment-card">
-                  <div className="ce-assignment-header">
-                    <span className="ce-assignment-id">#{report.id}</span>
-                  </div>
-                  <div className="ce-assignment-org">
-                    {report.organism_name || report.company_name}
-                  </div>
-                  <div className="ce-assignment-actions">
-                    <select 
-                      onChange={(e) => handleAssign(report.id, e.target.value)}
-                      defaultValue=""
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        background: 'rgba(255,255,255,0.1)',
-                        border: '1px solid rgba(139,92,246,0.3)',
-                        color: '#fff',
-                        fontSize: '13px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="">Assigner à...</option>
-                      {chargesEtude.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <h2 className="ce-section-title">🔬 Examen Technique Détaillé - {selectedReport.organism_name || selectedReport.company_name}</h2>
+            <TechnicalReviewInterface 
+              report={selectedReport}
+              onValidate={handleValidateReport}
+              onReject={handleRejectReport}
+              onStartAnalysis={handleStartAnalysis}
+            />
           </div>
         )}
       </div>

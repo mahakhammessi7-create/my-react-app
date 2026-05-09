@@ -1,734 +1,824 @@
-// 📁 src/components/Module3_TechnicalReview/TechnicalReviewInterface.js
+import { useState, useRef } from 'react';
+import { useAnnotations } from '../../hooks/Useannotations';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import API from '../../services/api';
-
-/* ══════════════════════════════════════════════
-  THEME CONSTANTS
-══════════════════════════════════════════════ */
-const T = {
-  bg:      '#07111e',
-  surface: 'rgba(255,255,255,.028)',
-  border:  'rgba(255,255,255,.07)',
-  teal:    '#63d2be',
-  green:   '#4ade80',
-  amber:   '#fbbf24',
-  red:     '#f87171',
-  purple:  '#818cf8',
-  blue:    '#38bdf8',
-  muted:   '#3d607a',
-  text:    '#c8dff4',
-};
-
+// ─── Styles (injectés une seule fois dans le <head>) ──────────────────────────
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+  .tri-wrap {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 20px;
+    align-items: start;
+  }
 
-@keyframes tri-fadeUp   { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-@keyframes tri-pulse    { 0%,100%{opacity:.4} 50%{opacity:1} }
-@keyframes tri-spin     { to{transform:rotate(360deg)} }
-@keyframes tri-barFill  { from{width:0} }
-@keyframes tri-shimmer  {
-  0%   { background-position: -400px 0 }
-  100% { background-position:  400px 0 }
-}
+  /* ── Left panel: données extraites ── */
+  .tri-data-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(139,92,246,0.1);
+    border-radius: 14px;
+    overflow: hidden;
+  }
 
-.tri-root { font-family:'DM Sans',sans-serif; color:${T.text}; }
-.tri-root * { box-sizing:border-box; margin:0; padding:0; }
+  .tri-tabs {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.2);
+    border-bottom: 1px solid rgba(139,92,246,0.1);
+  }
 
-.tri-stagger > *:nth-child(1){animation:tri-fadeUp .45s .04s both}
-.tri-stagger > *:nth-child(2){animation:tri-fadeUp .45s .10s both}
-.tri-stagger > *:nth-child(3){animation:tri-fadeUp .45s .16s both}
-.tri-stagger > *:nth-child(4){animation:tri-fadeUp .45s .22s both}
-.tri-stagger > *:nth-child(5){animation:tri-fadeUp .45s .28s both}
-.tri-stagger > *:nth-child(6){animation:tri-fadeUp .45s .34s both}
+  .tri-tab {
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid rgba(139,92,246,0.2);
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all .15s;
+  }
 
-.tri-root ::-webkit-scrollbar        { width:5px; height:5px }
-.tri-root ::-webkit-scrollbar-track  { background:transparent }
-.tri-root ::-webkit-scrollbar-thumb  { background:rgba(99,210,190,.25); border-radius:99px }
+  .tri-tab:hover { background: rgba(139,92,246,0.1); color: #c4b5fd; }
+  .tri-tab.active { background: rgba(139,92,246,0.25); border-color: rgba(139,92,246,0.5); color: #fff; }
 
-.tri-report-row {
-  display:flex; align-items:center; gap:14px;
-  padding:14px 18px;
-  border:1px solid ${T.border};
-  border-radius:14px;
-  background:${T.surface};
-  cursor:pointer;
-  transition:border-color .2s, background .2s, transform .2s;
-}
-.tri-report-row:hover, .tri-report-row.active {
-  border-color:rgba(99,210,190,.3);
-  background:rgba(99,210,190,.04);
-  transform:translateX(4px);
-}
-.tri-report-row.active { border-color:${T.teal}; }
+  .tri-panel { padding: 18px; }
 
-.tri-field-card {
-  border:1px solid ${T.border};
-  border-radius:14px;
-  background:${T.surface};
-  overflow:hidden;
-  transition:border-color .2s, transform .2s;
-  cursor:pointer;
-}
-.tri-field-card:hover  { border-color:rgba(99,210,190,.2); transform:translateX(3px); }
-.tri-field-card.open   { border-color:rgba(99,210,190,.35); }
+  .tri-kv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-.tri-ann-panel {
-  border-top:1px solid ${T.border};
-  background:rgba(0,0,0,.18);
-  padding:16px 20px;
-  animation:tri-fadeUp .3s both;
-}
+  .tri-kv-item {
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(139,92,246,0.08);
+    border-radius: 10px;
+  }
 
-.tri-input, .tri-textarea {
-  width:100%;
-  background:rgba(255,255,255,.04);
-  border:1px solid rgba(99,210,190,.2);
-  border-radius:10px;
-  color:${T.text};
-  font-family:'DM Sans',sans-serif;
-  font-size:13px;
-  padding:10px 14px;
-  outline:none;
-  transition:border-color .2s;
-  resize:vertical;
-}
-.tri-input:focus, .tri-textarea:focus { border-color:${T.teal}; }
+  .tri-kv-label { font-size: 11px; color: #64748b; margin-bottom: 3px; }
+  .tri-kv-value { font-size: 13px; color: #e2e8f0; font-weight: 500; }
+  .tri-kv-value.missing { color: #475569; font-style: italic; font-weight: 400; }
 
-.tri-btn {
-  display:inline-flex; align-items:center; gap:7px;
-  padding:9px 18px;
-  border-radius:10px;
-  font-family:'DM Sans',sans-serif;
-  font-size:13px;
-  font-weight:600;
-  cursor:pointer;
-  border:none;
-  transition:filter .2s, transform .15s;
-}
-.tri-btn:hover:not(:disabled) { filter:brightness(1.15); transform:translateY(-1px); }
-.tri-btn:disabled { opacity:.45; cursor:not-allowed; }
-.tri-btn-primary   { background:linear-gradient(135deg,${T.teal},#2eb8a0); color:#071520; }
-.tri-btn-ghost     { background:rgba(99,210,190,.1); border:1px solid rgba(99,210,190,.2); color:${T.teal}; }
-.tri-btn-danger    { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.2); color:${T.red}; }
-.tri-btn-save      { background:rgba(74,222,128,.12); border:1px solid rgba(74,222,128,.25); color:${T.green}; }
-.tri-btn-sm        { padding:6px 12px; font-size:12px; border-radius:8px; }
+  .tri-score-bar { background: rgba(255,255,255,0.08); border-radius: 99px; height: 6px; margin-top: 6px; overflow: hidden; }
+  .tri-score-fill { height: 100%; border-radius: 99px; }
 
-.tri-skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(99,210,190,.07) 50%, rgba(255,255,255,.04) 75%);
-  background-size: 400px 100%;
-  animation: tri-shimmer 1.4s infinite;
-  border-radius: 8px;
-}
+  .tri-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tri-table th { padding: 8px 10px; text-align: left; font-weight: 600; color: #64748b; border-bottom: 1px solid rgba(139,92,246,0.1); }
+  .tri-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #cbd5e1; }
+  .tri-table tr:last-child td { border-bottom: none; }
 
-.tri-bar-track { width:100%; height:7px; background:rgba(255,255,255,.06); border-radius:99px; overflow:hidden; }
-.tri-bar-fill  { height:100%; border-radius:99px; animation:tri-barFill 1.2s cubic-bezier(.22,1,.36,1) both; }
+  .tri-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tri-badge-ok  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+  .tri-badge-mid { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+  .tri-badge-err { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
 
-.tri-badge {
-  display:inline-flex; align-items:center; gap:5px;
-  padding:3px 10px; border-radius:99px;
-  font-size:10px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; white-space:nowrap;
-}
+  .tri-phase-list { display: flex; flex-direction: column; gap: 6px; }
+  .tri-phase-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    font-size: 13px; color: #cbd5e1;
+  }
+  .tri-phase-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(139,92,246,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #c4b5fd; flex-shrink: 0;
+  }
+
+  .tri-vuln-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; margin-bottom: 6px;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.15);
+    border-radius: 8px;
+    font-size: 12px; color: #fca5a5;
+  }
+
+  .tri-indicator-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .tri-indicator-box {
+    padding: 12px 10px; text-align: center;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px; border: 1px solid rgba(139,92,246,0.1);
+  }
+  .tri-indicator-label { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+
+  /* ── Right panel: annotations ── */
+  .tri-ann-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(139,92,246,0.1);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .tri-ann-head {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(139,92,246,0.1);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .tri-ann-head h3 { font-size: 15px; font-weight: 600; color: #fff; }
+
+  .tri-counts { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin: 14px 16px 0; }
+  .tri-count-box {
+    padding: 8px 6px; text-align: center;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+  }
+  .tri-count-n { font-size: 20px; font-weight: 700; }
+  .tri-count-l { font-size: 10px; color: #64748b; margin-top: 1px; }
+  .n-r { color: #a78bfa; }
+  .n-v { color: #fbbf24; }
+  .n-c { color: #34d399; }
+
+  .tri-form { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+  .tri-form-group { display: flex; flex-direction: column; gap: 4px; }
+  .tri-form-label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .4px; }
+
+  .tri-form select,
+  .tri-form textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 13px;
+    font-family: inherit;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .tri-form select:focus,
+  .tri-form textarea:focus { border-color: rgba(139,92,246,0.5); }
+  .tri-form textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+  .tri-btn-row { display: flex; gap: 8px; }
+
+  .tri-btn-add {
+    flex: 1; padding: 9px 14px;
+    background: rgba(139,92,246,0.15);
+    border: 1px solid rgba(139,92,246,0.3);
+    border-radius: 8px;
+    color: #c4b5fd; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+  }
+  .tri-btn-add:hover:not(:disabled) { background: rgba(139,92,246,0.25); }
+  .tri-btn-add:disabled { opacity: .5; cursor: not-allowed; }
+
+  .tri-btn-ai {
+    flex: 1; padding: 9px 14px;
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 8px;
+    color: #818cf8; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+  }
+  .tri-btn-ai:hover:not(:disabled) { background: rgba(99,102,241,0.2); }
+  .tri-btn-ai:disabled { opacity: .5; cursor: not-allowed; }
+
+  .tri-ai-box {
+    padding: 10px 12px;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 8px;
+    font-size: 12px; color: #a5b4fc; line-height: 1.6;
+  }
+
+  .tri-ai-use {
+    margin-top: 8px;
+    padding: 5px 12px;
+    background: rgba(99,102,241,0.2);
+    border: 1px solid rgba(99,102,241,0.4);
+    border-radius: 6px;
+    color: #c7d2fe; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+  }
+
+  .tri-ann-divider {
+    font-size: 10px; font-weight: 700; color: #475569;
+    text-transform: uppercase; letter-spacing: .5px;
+    padding: 4px 16px;
+    border-top: 1px solid rgba(139,92,246,0.08);
+    margin-top: 4px; padding-top: 12px;
+  }
+
+  .tri-ann-list {
+    max-height: 340px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 0 16px 16px;
+  }
+
+  .tri-ann-item {
+    padding: 10px 12px; border-radius: 10px;
+    border-left: 3px solid transparent;
+  }
+  .ann-remarque       { background: rgba(139,92,246,0.08); border-left-color: #8b5cf6; }
+  .ann-reserve        { background: rgba(245,158,11,0.08);  border-left-color: #f59e0b; }
+  .ann-recommandation { background: rgba(16,185,129,0.08);  border-left-color: #10b981; }
+
+  .tri-ann-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+  .type-r { color: #a78bfa; }
+  .type-v { color: #fbbf24; }
+  .type-c { color: #34d399; }
+
+  .tri-ann-target {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 99px;
+    font-size: 10px; color: #94a3b8;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 4px;
+  }
+
+  .tri-ann-text { font-size: 12px; color: #cbd5e1; line-height: 1.5; }
+  .tri-ann-meta { font-size: 10px; color: #475569; margin-top: 4px; }
+  .tri-ann-del {
+    font-size: 11px; color: #475569;
+    background: none; border: none;
+    cursor: pointer; padding: 3px 6px; border-radius: 4px;
+    margin-top: 4px; transition: all .15s;
+  }
+  .tri-ann-del:hover { color: #f87171; background: rgba(239,68,68,0.1); }
+
+  .tri-empty {
+    text-align: center; padding: 24px 16px;
+    color: #475569; font-size: 12px;
+  }
+
+  .tri-export {
+    margin: 0 16px 16px;
+    width: calc(100% - 32px);
+    padding: 9px;
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 8px;
+    color: #34d399; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+  }
+  .tri-export:hover { background: rgba(16,185,129,0.2); }
+
+  .tri-error { padding: 10px 16px; font-size: 12px; color: #f87171; }
 `;
 
-const STATUS_META = {
-  verified:     { label:'Vérifié',   color:T.green,  icon:'✓' },
-  'needs-review':{ label:'À réviser', color:T.amber,  icon:'⚠' },
-  corrected:    { label:'Corrigé',   color:T.blue,   icon:'✎' },
-  flagged:      { label:'Signalé',   color:T.red,    icon:'🚩' },
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function Badge({ score }) {
+  const cls = score >= 75 ? 'tri-badge-ok' : score >= 50 ? 'tri-badge-mid' : 'tri-badge-err';
+  return <span className={`tri-badge ${cls}`}>{score}%</span>;
+}
 
-const NIVEAUX = [
-  { max:40, label:'Critique',     color:T.red   },
-  { max:60, label:'Partiel',      color:T.amber },
-  { max:80, label:'Satisfaisant', color:T.amber },
-  { max:100,label:'Optimisé',     color:T.green },
+function CiaBadge({ v }) {
+  if (v == null) return <span style={{ color: '#475569' }}>—</span>;
+  const cls = v >= 3 ? 'tri-badge-err' : 'tri-badge-mid';
+  return <span className={`tri-badge ${cls}`}>{v}/4</span>;
+}
+
+// ─── Panels par annexe ────────────────────────────────────────────────────────
+function PanelA1({ data = {} }) {
+  const fields = [
+    ['Organisme',    data.nom_organisme],
+    ['Acronyme',     data.acronyme],
+    ['Statut',       data.statut],
+    ['Secteur',      data.secteur_activite],
+    ['Email',        data.adresse_email],
+    ['Site web',     data.site_web],
+  ];
+  return (
+    <div className="tri-kv">
+      {fields.map(([label, val]) => (
+        <div className="tri-kv-item" key={label}>
+          <div className="tri-kv-label">{label}</div>
+          <div className={`tri-kv-value ${val ? '' : 'missing'}`}>{val || 'Non renseigné'}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PanelA2({ data = {} }) {
+  const processus = data.processus || [];
+  if (!processus.length) return <p style={{ color: '#475569', fontSize: 13 }}>Aucun processus extrait.</p>;
+  return (
+    <table className="tri-table">
+      <thead>
+        <tr>
+          <th>Processus</th>
+          <th>Confidentialité</th>
+          <th>Intégrité</th>
+          <th>Disponibilité</th>
+        </tr>
+      </thead>
+      <tbody>
+        {processus.map((p, i) => (
+          <tr key={i}>
+            <td style={{ fontWeight: 500 }}>{p.processus || p.p}</td>
+            <td><CiaBadge v={p.confidentialite ?? p.c} /></td>
+            <td><CiaBadge v={p.integrite ?? p.i} /></td>
+            <td><CiaBadge v={p.disponibilite ?? p.d} /></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function PanelA3({ data = {} }) {
+  const items = [
+    ['Serveurs',          data.serveurs?.length ?? data.serveurs ?? 0],
+    ['Applications',      data.applications?.length ?? data.applications ?? 0],
+    ['Équipements réseau',data.infrastructure_reseau?.length ?? data.network ?? 0],
+    ['Postes de travail', data.postes_travail?.length ?? data.postes ?? 0],
+  ];
+  return (
+    <div className="tri-kv">
+      {items.map(([label, val]) => (
+        <div className="tri-kv-item" key={label}>
+          <div className="tri-kv-label">{label}</div>
+          <div className="tri-kv-value" style={{ fontSize: 22, color: '#a78bfa' }}>{val}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PanelA4({ data = {} }) {
+  const phases = data.phases || [];
+  if (!phases.length) {
+    return <p style={{ color: '#475569', fontSize: 13 }}>{data.texte_brut || 'Aucune phase extraite.'}</p>;
+  }
+  return (
+    <div className="tri-phase-list">
+      {phases.map((ph, i) => (
+        <div className="tri-phase-item" key={i}>
+          <div className="tri-phase-num">{i + 1}</div>
+          <span>{ph.phase || ph}</span>
+          {ph.date_debut && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#475569' }}>{ph.date_debut}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PanelA5({ data = {} }) {
+  const actions = data.actions || [];
+  if (!actions.length) return <p style={{ color: '#475569', fontSize: 13 }}>Aucune action extraite.</p>;
+  return (
+    <table className="tri-table">
+      <thead><tr><th>Action</th><th>Responsable</th><th>Taux</th><th>Évaluation</th></tr></thead>
+      <tbody>
+        {actions.map((a, i) => (
+          <tr key={i}>
+            <td>{a.action}</td>
+            <td style={{ color: '#94a3b8' }}>{a.responsable || '—'}</td>
+            <td>
+              {a.taux_realisation
+                ? <span className={`tri-badge ${parseInt(a.taux_realisation) >= 80 ? 'tri-badge-ok' : 'tri-badge-mid'}`}>{a.taux_realisation}</span>
+                : '—'}
+            </td>
+            <td style={{ color: '#94a3b8' }}>{a.evaluation || '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function PanelA6({ data = {} }) {
+  const criteres = data.criteres || [];
+  const maturite = data.maturite || 0;
+  const pct      = (maturite / 5) * 100;
+  const color    = pct >= 60 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444';
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 28, fontWeight: 700, color }}>{maturite}</span>
+        <span style={{ color: '#64748b', fontSize: 13 }}>/5 — maturité globale</span>
+      </div>
+      <div className="tri-score-bar" style={{ height: 8, marginBottom: 16 }}>
+        <div className="tri-score-fill" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      {criteres.length > 0 && (
+        <table className="tri-table">
+          <thead><tr><th>Domaine</th><th>Critère</th><th>Score</th></tr></thead>
+          <tbody>
+            {criteres.map((c, i) => (
+              <tr key={i}>
+                <td style={{ color: '#64748b' }}>{c.domaine || '—'}</td>
+                <td>{c.critere || c}</td>
+                <td>
+                  {c.score != null
+                    ? <span className={`tri-badge ${c.score >= 4 ? 'tri-badge-ok' : c.score >= 2 ? 'tri-badge-mid' : 'tri-badge-err'}`}>{c.score}/5</span>
+                    : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function PanelA7({ data = {} }) {
+  const indicators = data.indicateurs || [];
+  const detail     = data.indicateurs_detail || [];
+  return (
+    <div>
+      <div className="tri-indicator-grid" style={{ marginBottom: 16 }}>
+        {indicators.map(ind => (
+          <div className="tri-indicator-box" key={ind.nom}>
+            <span className={`tri-badge ${ind.present ? 'tri-badge-ok' : 'tri-badge-err'}`}>
+              {ind.present ? '✓ Oui' : '✕ Non'}
+            </span>
+            <div className="tri-indicator-label">{ind.nom}</div>
+          </div>
+        ))}
+      </div>
+      {detail.length > 0 && (
+        <table className="tri-table">
+          <thead><tr><th>Indicateur</th><th>Valeur attendue</th><th>Valeur constatée</th></tr></thead>
+          <tbody>
+            {detail.slice(0, 8).map((d, i) => (
+              <tr key={i}>
+                <td>{d.indicateur}</td>
+                <td style={{ color: '#64748b' }}>{d.valeur_attendue || '—'}</td>
+                <td>{d.valeur || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function PanelA8({ data = {} }) {
+  const vulns = data.vulnerabilites || [];
+  if (!vulns.length) return <p style={{ color: '#475569', fontSize: 13 }}>Aucune vulnérabilité extraite.</p>;
+  return (
+    <div>
+      {vulns.map((v, i) => (
+        <div className="tri-vuln-item" key={i}>
+          <span style={{ fontSize: 16 }}>⚠</span>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>{v.nom}</div>
+            {v.actifs_impactes && <div style={{ fontSize: 11, color: '#94a3b8' }}>Actifs: {v.actifs_impactes}</div>}
+            {v.recommandation && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{v.recommandation}</div>}
+          </div>
+          {v.impact && (
+            <span className="tri-badge tri-badge-err" style={{ marginLeft: 'auto', flexShrink: 0 }}>{v.impact}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PanelA9({ data = {} }) {
+  const projets = data.projets || [];
+  const actions = projets.flatMap(p => p.actions || []);
+  if (!actions.length) return <p style={{ color: '#475569', fontSize: 13 }}>Aucune action planifiée extraite.</p>;
+  return (
+    <table className="tri-table">
+      <thead><tr><th>Action</th><th>Priorité</th><th>Responsable</th><th>Date prévue</th></tr></thead>
+      <tbody>
+        {actions.map((a, i) => (
+          <tr key={i}>
+            <td>{a.action}</td>
+            <td>
+              <span className={`tri-badge ${
+                a.priorite === 'P1' || a.priorite?.toLowerCase() === 'haute'
+                  ? 'tri-badge-err'
+                  : a.priorite === 'P2' || a.priorite?.toLowerCase() === 'moyenne'
+                  ? 'tri-badge-mid'
+                  : 'tri-badge-ok'
+              }`}>{a.priorite || '—'}</span>
+            </td>
+            <td style={{ color: '#94a3b8' }}>{a.responsable || '—'}</td>
+            <td style={{ color: '#64748b' }}>{a.date_prevue || '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// ─── Mapping onglets → panels ─────────────────────────────────────────────────
+const ANNEX_TABS = [
+  { n: 1,  label: 'A1',  title: 'Identification',      Component: PanelA1,  key: 'annexe1' },
+  { n: 2,  label: 'A2',  title: 'Classification',      Component: PanelA2,  key: 'annexe2' },
+  { n: 3,  label: 'A3',  title: 'SI',                  Component: PanelA3,  key: 'annexe3' },
+  { n: 4,  label: 'A4',  title: 'Planning',             Component: PanelA4,  key: 'annexe4' },
+  { n: 5,  label: 'A5',  title: 'Plan précédent',       Component: PanelA5,  key: 'annexe5' },
+  { n: 6,  label: 'A6',  title: 'Maturité',             Component: PanelA6,  key: 'annexe6' },
+  { n: 7,  label: 'A7',  title: 'Indicateurs',          Component: PanelA7,  key: 'annexe7' },
+  { n: 8,  label: 'A8',  title: 'Vulnérabilités',       Component: PanelA8,  key: 'annexe8' },
+  { n: 9,  label: 'A9',  title: "Plan d'action",        Component: PanelA9,  key: 'annexe9' },
 ];
 
-const getNiveau = (v) => NIVEAUX.find(n => v <= n.max) || NIVEAUX[3];
+// ─── Composant principal ──────────────────────────────────────────────────────
+export default function TechnicalReviewInterface({ report, onValidate, onReject, onStartAnalysis }) {
+  const [activeTab,  setActiveTab]  = useState(1);
+  const [annType,    setAnnType]    = useState('remarque');
+  const [annTarget,  setAnnTarget]  = useState('Annexe 1');
+  const [annText,    setAnnText]    = useState('');
+  const [aiText,     setAiText]     = useState('');
+  const [aiLoading,  setAiLoading]  = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [toast,      setToast]      = useState(null);
 
-function injectStyles() {
-  if (document.getElementById('tri-styles')) return;
-  const el = document.createElement('style');
-  el.id = 'tri-styles';
-  el.textContent = CSS;
-  document.head.appendChild(el);
-}
+  const { annotations, loading: annLoading, error: annError, counts, addAnnotation, deleteAnnotation } =
+    useAnnotations(report?.id);
 
-/* ══════════════════════════════════════════════
-  HELPERS
-══════════════════════════════════════════════ */
-function buildFields(report) {
-  const details = (() => {
-    try { return JSON.parse(report.compliance_details || '{}'); } catch { return {}; }
-  })();
+  // extracted_data vient du backend (résultat de ancs_extractor.py)
+  const extracted = report?.extracted_data || report?.extractedData || {};
 
-  const a3 = details.annexe3 || {};
-  const a7 = details.annexe7 || {};
-  const annexeStatus = details.annexe_status || {};
+  // ── Injecter CSS une seule fois ──────────────────────────────────────────
+  const styleRef = useRef(false);
+  if (!styleRef.current) {
+    const el = document.createElement('style');
+    el.textContent = CSS;
+    document.head.appendChild(el);
+    styleRef.current = true;
+  }
 
-  const fields = [
-    { id:'f-name', label:"Nom de l'organisme", value: report.organism_name || details.annexe1?.nom_organisme || '—', category:'Général', confidence:95 },
-    { id:'f-sector', label:"Secteur d'activité", value: report.organism_sector || details.annexe1?.secteur_activite || '—', category:'Général', confidence:90 },
-    { id:'f-acronym', label:'Acronyme', value: details.annexe1?.acronyme || '—', category:'Général', confidence:80 },
-    { id:'f-statut', label:'Statut juridique', value: details.annexe1?.statut || '—', category:'Général', confidence:80 },
-    { id:'f-email', label:'Email contact', value: details.annexe1?.adresse_email || '—', category:'Général', confidence:80 },
-    { id:'f-web', label:'Site web', value: details.annexe1?.site_web || '—', category:'Général', confidence:75 },
-    { id:'f-rssi', label:'RSSI nommé', value: report.has_rssi ?? details.has_rssi, category:'Gouvernance', confidence:88 },
-    { id:'f-pssi', label:'PSSI documentée', value: report.has_pssi ?? details.has_pssi, category:'Gouvernance', confidence:85 },
-    { id:'f-pca', label:'PCA existant', value: report.has_pca ?? details.has_pca, category:'Gouvernance', confidence:82 },
-    { id:'f-pra', label:'PRA existant', value: report.has_pra ?? details.has_pra, category:'Gouvernance', confidence:82 },
-    { id:'f-siem', label:'SIEM déployé', value: a7.indicateurs?.find(i => i.nom === 'SIEM')?.present ?? false, category:'Gouvernance', confidence:78 },
-    { id:'f-comite', label:'Comité SSI', value: a7.indicateurs?.find(i => i.nom === 'Comité SSI')?.present ?? false, category:'Gouvernance', confidence:78 },
-    { id:'f-score', label:'Score de conformité', value: `${report.compliance_score ?? 0}%`, category:'Évaluation', confidence:92 },
-    { id:'f-risk', label:'Niveau de risque', value: report.risk_score ?? details.risk_score ?? '—', category:'Évaluation', confidence:85 },
-    { id:'f-maturity', label:'Niveau de maturité', value: `${report.maturity_level ?? details.maturity_level ?? '—'} / 5`, category:'Évaluation', confidence:75 },
-    { id:'f-servers', label:'Nombre de serveurs', value: report.total_servers ?? a3.serveurs?.length ?? '—', category:'Infrastructure', confidence:88 },
-    { id:'f-users', label:"Nombre d'utilisateurs", value: report.user_count ?? details.user_count ?? '—', category:'Infrastructure', confidence:80 },
-    { id:'f-fw', label:'Firewall', value: report.has_firewall ?? details.has_firewall, category:'Infrastructure', confidence:85 },
-    { id:'f-ids', label:'IDS / IPS', value: report.has_ids_ips ?? details.has_ids_ips, category:'Infrastructure', confidence:82 },
-    { id:'f-mfa', label:'MFA activé', value: report.mfa_enabled ?? details.mfa_enabled, category:'Infrastructure', confidence:80 },
-    { id:'f-vlan', label:'Segmentation réseau', value: report.network_segmentation ?? details.network_segmentation, category:'Infrastructure', confidence:78 },
-    { id:'f-av', label:'Antivirus (%)', value: `${report.antivirus_coverage_pct ?? details.antivirus_coverage_pct ?? 0}%`, category:'Infrastructure', confidence:80 },
-    { id:'f-patch', label:'Conformité patches (%)', value: `${report.patch_compliance_pct ?? details.patch_compliance_pct ?? 0}%`, category:'Infrastructure', confidence:78 },
-    { id:'f-backup', label:'Politique de sauvegarde', value: report.backup_policy_exists ?? details.backup_policy_exists, category:'Sauvegarde', confidence:82 },
-    { id:'f-bktest', label:'Sauvegardes testées', value: report.backup_tested ?? details.backup_tested, category:'Sauvegarde', confidence:78 },
-    { id:'f-bkoffsite', label:'Sauvegarde hors-site', value: report.backup_offsite ?? details.backup_offsite, category:'Sauvegarde', confidence:75 },
-    { id:'f-bkfreq', label:'Fréquence sauvegarde', value: details.backup_frequency || '—', category:'Sauvegarde', confidence:70 },
-    { id:'f-incidents', label:'Incidents déclarés', value: report.incidents_count ?? details.incidents_count ?? '—', category:'Incidents', confidence:70 },
-    { id:'f-vulns', label:'Vulnérabilités critiques', value: report.critical_vulns_open ?? details.critical_vulns_open ?? '—', category:'Incidents', confidence:70 },
-    ...Object.entries(annexeStatus).map(([key, val]) => ({
-      id: `f-${key}`,
-      label: `${key.replace('annexe', 'Annexe ')} — ${val.title || 'Sans titre'}`,
-      value: val.status === 'filled' ? 'Conforme' : val.status === 'partial' ? 'Partiel' : 'Vide',
-      category: 'Statut des annexes',
-      confidence: val.status === 'filled' ? 90 : val.status === 'partial' ? 60 : 30,
-    })),
-  ];
+  // ── Trouver l'onglet actif ────────────────────────────────────────────────
+  const currentTab = ANNEX_TABS.find(t => t.n === activeTab);
 
-  return fields
-    .filter(f => f.value !== '—' && f.value !== undefined && f.value !== null)
-    .map(f => ({ ...f, status: 'needs-review', annotations: [] }));
-}
-
-/* ══════════════════════════════════════════════
-  SUB-COMPONENTS
-══════════════════════════════════════════════ */
-function Badge({ status }) {
-  const m = STATUS_META[status] || STATUS_META['needs-review'];
-  return (
-    <span className="tri-badge" style={{ background:`${m.color}14`, color:m.color, border:`1px solid ${m.color}28` }}>
-      <span style={{ width:5, height:5, borderRadius:'50%', background:m.color }} />
-      {m.icon} {m.label}
-    </span>
-  );
-}
-
-function BarTrack({ value, color }) {
-  return (
-    <div className="tri-bar-track">
-      <div className="tri-bar-fill" style={{ width:`${value}%`, background:`linear-gradient(90deg,${color}55,${color})`, boxShadow:`0 0 8px ${color}44` }} />
-    </div>
-  );
-}
-
-function Skeleton({ h = 18, w = '100%', style = {} }) {
-  return <div className="tri-skeleton" style={{ height:h, width:w, ...style }} />;
-}
-
-function ReportSelector({ reports, selectedId, onSelect }) {
-  const [search, setSearch] = useState('');
-  const filtered = reports.filter(r =>
-    (r.organism_name || r.company_name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (r.organism_sector || r.sector || '').toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      <input className="tri-input" placeholder="🔍 Rechercher un organisme..." value={search} onChange={e => setSearch(e.target.value)} />
-      <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:380, overflowY:'auto', paddingRight:4 }}>
-        {filtered.length === 0 && (
-          <div style={{ padding:'20px', textAlign:'center', color:T.muted, fontSize:13 }}>Aucun rapport trouvé</div>
-        )}
-        {filtered.map(r => {
-          const score = r.compliance_score || 0;
-          const niv   = getNiveau(score);
-          const name  = r.organism_name || r.company_name || 'Inconnu';
-          const sector= r.organism_sector || r.sector || '—';
-          const date  = r.upload_date ? new Date(r.upload_date).toLocaleDateString('fr-FR') : '—';
-          return (
-            <div key={r.id} className={`tri-report-row ${selectedId === r.id ? 'active' : ''}`} onClick={() => onSelect(r)}>
-              <div style={{ width:40, height:40, borderRadius:12, background:'linear-gradient(135deg,#0d5580,#1a7a6e)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight:800, fontSize:15, fontFamily:"'Syne',sans-serif", flexShrink:0 }}>
-                {name.charAt(0).toUpperCase()}
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:600, color:'#e2f0ff', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
-                <div style={{ fontSize:11, color:T.muted }}>{sector} · {date}</div>
-              </div>
-              <div style={{ textAlign:'right', flexShrink:0 }}>
-                <div style={{ fontSize:14, fontWeight:800, color:niv.color, fontFamily:"'Syne',sans-serif" }}>{score}%</div>
-                <div style={{ fontSize:10, color:T.muted }}>{r.status || 'pending'}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function FieldCard({ field, onStatusChange, onSaveEdit, onAddAnnotation }) {
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(String(field.value ?? ''));
-  const [annText, setAnnText] = useState('');
-
-  const displayVal = typeof field.value === 'boolean' ? (field.value ? '✓ Oui' : '✗ Non') : String(field.value ?? '—');
-
-  return (
-    <div className={`tri-field-card ${open ? 'open' : ''}`}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'13px 18px' }} onClick={() => setOpen(o => !o)}>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:11, color:T.muted, textTransform:'uppercase', letterSpacing:'.5px', fontWeight:600, marginBottom:3 }}>{field.label}</div>
-          {editing ? (
-            <input className="tri-input" value={val} onChange={e => setVal(e.target.value)} onClick={e => e.stopPropagation()} autoFocus />
-          ) : (
-            <div style={{ fontSize:13, fontWeight:600, color:'#e2f0ff' }}>{displayVal}</div>
-          )}
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }} onClick={e => e.stopPropagation()}>
-          {field.confidence && (
-            <div style={{ width:60, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:3 }}>
-              <span style={{ fontSize:10, color:T.muted }}>{field.confidence}%</span>
-              <BarTrack value={field.confidence} color={field.confidence >= 85 ? T.green : field.confidence >= 70 ? T.amber : T.red} />
-            </div>
-          )}
-          <Badge status={field.status} />
-          {editing ? (
-            <>
-              <button className="tri-btn tri-btn-save tri-btn-sm" onClick={() => { onSaveEdit(field.id, val); setEditing(false); }}>💾</button>
-              <button className="tri-btn tri-btn-ghost tri-btn-sm" onClick={() => setEditing(false)}>✕</button>
-            </>
-          ) : (
-            <button className="tri-btn tri-btn-ghost tri-btn-sm" onClick={() => setEditing(true)}>✎</button>
-          )}
-          <span style={{ color:T.muted, fontSize:12, transition:'transform .2s', display:'inline-block', transform: open ? 'rotate(90deg)':'rotate(0)' }}>›</span>
-        </div>
-      </div>
-      {open && (
-        <div className="tri-ann-panel" onClick={e => e.stopPropagation()}>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:14 }}>
-            {Object.entries(STATUS_META).map(([key, m]) => (
-              <button key={key} className="tri-btn tri-btn-sm" style={{ background:`${m.color}12`, border:`1px solid ${m.color}28`, color:m.color, opacity: field.status === key ? 1 : 0.55, outline: field.status === key ? `1px solid ${m.color}` : 'none' }} onClick={() => onStatusChange(field.id, key)}>
-                {m.icon} {m.label}
-              </button>
-            ))}
-          </div>
-          {field.annotations?.length > 0 && (
-            <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:11, color:T.muted, textTransform:'uppercase', letterSpacing:'.5px', fontWeight:600, marginBottom:8 }}>Annotations</div>
-              {field.annotations.map((a, i) => (
-                <div key={i} style={{ background:'rgba(255,255,255,.03)', border:`1px solid ${T.border}`, borderRadius:10, padding:'10px 14px', marginBottom:6 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                    <span style={{ fontSize:11, color:T.teal, fontWeight:600 }}>{a.author}</span>
-                    <span style={{ fontSize:10, color:T.muted }}>{new Date(a.timestamp).toLocaleString('fr-FR', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit' })}</span>
-                  </div>
-                  <p style={{ fontSize:12, color:'#c8dff4', lineHeight:1.5 }}>{a.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          <div style={{ fontSize:11, color:T.muted, textTransform:'uppercase', letterSpacing:'.5px', fontWeight:600, marginBottom:6 }}>💬 Ajouter une remarque / réserve</div>
-          <textarea className="tri-textarea" rows={3} placeholder="Entrez votre commentaire, correction ou observation..." value={annText} onChange={e => setAnnText(e.target.value)} />
-          <div style={{ display:'flex', justifyContent:'flex-end', marginTop:8 }}>
-            <button className="tri-btn tri-btn-primary tri-btn-sm" disabled={!annText.trim()} onClick={() => { onAddAnnotation(field.id, annText); setAnnText(''); }}>Ajouter l'annotation</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AnnexesDetails({ report }) {
-  const details = (() => {
-    try { return JSON.parse(report.compliance_details || '{}'); } catch { return {}; }
-  })();
-  
-  const servers = details.annexe3?.serveurs || [];
-  const vulns   = details.annexe8?.vulnerabilites || [];
-  const actions = details.annexe9?.projets?.[0]?.actions || [];
-
-  return (
-    <>
-      {servers.length > 0 && (
-        <div style={{ marginBottom:24 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-            <h3 style={{ fontFamily:"'Syne',sans-serif", fontSize:13, fontWeight:700, color:T.teal, textTransform:'uppercase', letterSpacing:'.6px' }}>Serveurs (Annexe 3)</h3>
-            <div style={{ flex:1, height:1, background:T.border }} />
-          </div>
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, color:T.text }}>
-              <thead><tr style={{ borderBottom:`1px solid ${T.border}` }}>{['Nom','IP','OS','Rôle','Type'].map(h => <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:T.muted, fontWeight:600, fontSize:11, textTransform:'uppercase', letterSpacing:'.4px' }}>{h}</th>)}</tr></thead>
-              <tbody>{servers.map((s, i) => <tr key={i} style={{ borderBottom:`1px solid ${T.border}`, background: i % 2 === 0 ? 'transparent' : T.surface }}><td style={{ padding:'8px 12px' }}>{s.nom || '—'}</td><td style={{ padding:'8px 12px', fontFamily:'monospace', color:T.blue }}>{s.ip || '—'}</td><td style={{ padding:'8px 12px' }}>{s.os || '—'}</td><td style={{ padding:'8px 12px' }}>{s.role || '—'}</td><td style={{ padding:'8px 12px' }}>{s.type || '—'}</td></tr>)}</tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {vulns.length > 0 && (
-        <div style={{ marginBottom:24 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-            <h3 style={{ fontFamily:"'Syne',sans-serif", fontSize:13, fontWeight:700, color:T.red, textTransform:'uppercase', letterSpacing:'.6px' }}>Vulnérabilités critiques (Annexe 8)</h3>
-            <div style={{ flex:1, height:1, background:T.border }} />
-          </div>
-          {vulns.map((v, i) => (
-            <div key={i} style={{ background:T.surface, border:`1px solid rgba(248,113,113,.15)`, borderRadius:12, padding:'12px 16px', marginBottom:8 }}>
-              <div style={{ fontWeight:600, fontSize:13, color:'#e2f0ff', marginBottom:4 }}>{v.nom}</div>
-              <div style={{ display:'flex', gap:16, fontSize:11, color:T.muted }}><span>Réf : {v.reference || '—'}</span><span>Probabilité : {v.probabilite || '—'}</span></div>
-              {v.recommandation && <div style={{ marginTop:6, fontSize:12, color:T.text }}>{v.recommandation}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-      {actions.length > 0 && (
-        <div style={{ marginBottom:24 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-            <h3 style={{ fontFamily:"'Syne',sans-serif", fontSize:13, fontWeight:700, color:T.purple, textTransform:'uppercase', letterSpacing:'.6px' }}>Plan d'action (Annexe 9)</h3>
-            <div style={{ flex:1, height:1, background:T.border }} />
-          </div>
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, color:T.text }}>
-              <thead><tr style={{ borderBottom:`1px solid ${T.border}` }}>{['Action','Priorité','Responsable','Charge (H/J)','Date prévue'].map(h => <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:T.muted, fontWeight:600, fontSize:11, textTransform:'uppercase', letterSpacing:'.4px' }}>{h}</th>)}</tr></thead>
-              <tbody>
-                {actions.map((a, i) => {
-                  const pColor = a.priorite?.toLowerCase().includes('haute') ? T.red : a.priorite?.toLowerCase().includes('moyenne') ? T.amber : T.green;
-                  return <tr key={i} style={{ borderBottom:`1px solid ${T.border}`, background: i % 2 === 0 ? 'transparent' : T.surface }}>
-                    <td style={{ padding:'8px 12px' }}>{a.action || '—'}</td>
-                    <td style={{ padding:'8px 12px' }}><span style={{ color: pColor, fontWeight:600 }}>{a.priorite || '—'}</span></td>
-                    <td style={{ padding:'8px 12px' }}>{a.responsable || '—'}</td>
-                    <td style={{ padding:'8px 12px', textAlign:'center' }}>{a.charge_hj || '—'}</td>
-                    <td style={{ padding:'8px 12px' }}>{a.date_prevue || '—'}</td>
-                  </tr>;
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-/* ══════════════════════════════════════════════
-  MAIN COMPONENT
-══════════════════════════════════════════════ */
-export default function TechnicalReviewInterface() {
-  const navigate = useNavigate();
-  const [reports, setReports] = useState([]);
-  const [loadingList, setLoadingList] = useState(true);
-  const [errorList, setErrorList] = useState(null);
-  const [selectedReport, setSelectedReport] = useState(null);
-  const [fields, setFields] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [currentUser] = useState(() => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      return user && user.role ? user : { id: null, username: 'Chargé d\'étude', role: 'technical_review' };
-    } catch {
-      return { id: null, username: 'Chargé d\'étude', role: 'technical_review' };
-    }
-  });
-
-  useEffect(() => { injectStyles(); return () => document.getElementById('tri-styles')?.remove(); }, []);
-
-  useEffect(() => {
-    API.get('/reports/all')
-      .then(res => {
-        const rows = res.data?.data || res.data?.reports || res.data || [];
-        const normalized = Array.isArray(rows) ? rows.map(r => ({
-          ...r,
-          status: String(r.status || r.validation_status || r.workflow_status || 'déposé').toLowerCase(),
-          assigned_to: r.assigned_to || r.responsable || r.assigned_charge || r.charge || r.assignee || '',
-        })) : [];
-
-        const role = String(currentUser.role || '').toLowerCase();
-        const visible = (role.includes('charge') || role.includes('technical'))
-          ? normalized.filter(r => r.assigned_to === currentUser.username || r.assigned_to === currentUser.email || ['assigned','verified','déposé','deposé'].includes(r.status))
-          : normalized;
-
-        setReports(visible);
-      })
-      .catch(err => setErrorList(err.message))
-      .finally(() => setLoadingList(false));
-  }, [currentUser]);
-
-  const handleSelect = useCallback((report) => {
-    setSelectedReport(report);
-    setFields(buildFields(report));
-    setFilter('all');
-  }, []);
-
-  const handleStatusChange = useCallback((fieldId, newStatus) => {
-    setFields(prev => prev.map(f => f.id === fieldId ? { ...f, status: newStatus } : f));
-    showToast(`Statut mis à jour : ${STATUS_META[newStatus]?.label}`);
-  }, []);
-
-  const handleSaveEdit = useCallback((fieldId, newVal) => {
-    setFields(prev => prev.map(f => f.id === fieldId ? { ...f, value: newVal, status: 'corrected' } : f));
-    showToast('Valeur corrigée ✓');
-  }, []);
-
-  const handleAddAnnotation = useCallback((fieldId, text) => {
-    const ann = { author: currentUser.name, text, timestamp: new Date().toISOString(), type: 'comment' };
-    setFields(prev => prev.map(f => f.id === fieldId ? { ...f, annotations: [...(f.annotations || []), ann] } : f));
-    showToast('Annotation ajoutée ✓');
-  }, [currentUser.name]);
-
-  const handleSaveDraft = useCallback(async () => {
-    if (!selectedReport) return;
+  // ── Ajouter une annotation ────────────────────────────────────────────────
+  const handleAdd = async () => {
+    if (!annText.trim()) return;
     setSaving(true);
-    try {
-      await API.post(`/reports/${selectedReport.id}/review`, {
-        report_id: selectedReport.id,
-        fields: fields.map(f => ({ id: f.id, label: f.label, value: f.value, status: f.status, annotations: f.annotations })),
-        saved_at: new Date().toISOString(),
-        is_draft: true,
-      });
-      showToast('💾 Brouillon enregistré avec succès', 'green');
-    } catch(e) {
-      showToast('Erreur lors de l\'enregistrement du brouillon', 'red');
-    } finally {
-      setSaving(false);
+    const result = await addAnnotation({ type: annType, target: annTarget, text: annText });
+    setSaving(false);
+    if (result.success) {
+      setAnnText('');
+      setAiText('');
+      showToast('Annotation ajoutée !');
+    } else {
+      showToast(result.error, true);
     }
-  }, [selectedReport, fields]);
-
-  const handleValidateTechnical = useCallback(async (reportId, reviewData) => {
-    if (!selectedReport) return;
-    setSaving(true);
-    try {
-      await API.patch(`/reports/${reportId}/technical-review`, {
-        status: 'verified',
-        technical_review: {
-          reviewed_by: currentUser.id,
-          reviewed_at: new Date().toISOString(),
-          confidence_score: reviewData.confidence,
-          annotations: reviewData.annotations,
-          corrections_made: reviewData.corrections
-        }
-      });
-      
-      try {
-        await API.post('/notifications', {
-          to_role: 'responsable',
-          type: 'REPORT_VERIFIED',
-          report_id: reportId,
-          message: `Rapport #${reportId} vérifié et prêt pour validation`
-        });
-      } catch (notifErr) {
-        console.warn('Notification non envoyée:', notifErr);
-      }
-      
-      setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: 'verified' } : r));
-      setSelectedReport(prev => prev ? { ...prev, status: 'verified' } : prev);
-      showToast('✅ Rapport marqué comme vérifié et envoyé au Responsable', 'green');
-    } catch (err) {
-      console.error('Erreur validation technique:', err);
-      showToast('Échec de la validation technique', 'red');
-    } finally {
-      setSaving(false);
-    }
-  }, [selectedReport, currentUser.id]);
-
-  const allCriticalFieldsReviewed = useMemo(() => {
-    const needsReviewCount = fields.filter(f => f.status === 'needs-review').length;
-    return needsReviewCount === 0 && fields.length > 0;
-  }, [fields]);
-
-  const collectedAnnotations = useMemo(() => {
-    return fields.flatMap(f => (f.annotations || []).map(ann => ({
-      field_id: f.id, field_label: f.label, text: ann.text, author: ann.author, timestamp: ann.timestamp
-    })));
-  }, [fields]);
-
-  const madeCorrections = useMemo(() => {
-    return fields.filter(f => f.status === 'corrected').map(f => ({
-      field_id: f.id, field_label: f.label, original_value: f.value, corrected_value: f.value, status: f.status
-    }));
-  }, [fields]);
-
-  const calculatedConfidence = useMemo(() => {
-    if (fields.length === 0) return 0;
-    const total = fields.reduce((sum, f) => sum + (f.confidence || 0), 0);
-    return Math.round(total / fields.length);
-  }, [fields]);
-
-  const handleExport = () => {
-    if (!selectedReport) return;
-    const exportData = { report: selectedReport, review_fields: fields, exported_at: new Date().toISOString() };
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', `rapport_${selectedReport.id}_review.json`);
-    linkElement.click();
-    showToast('Export JSON effectué ✓', 'green');
   };
 
-  const showToast = (msg, type = 'teal') => {
-    const color = type === 'green' ? T.green : type === 'red' ? T.red : T.teal;
-    setToast({ msg, color });
+  // ── Supprimer une annotation ──────────────────────────────────────────────
+  const handleDelete = async (id) => {
+    const result = await deleteAnnotation(id);
+    if (!result.success) showToast(result.error, true);
+  };
+
+  // ── Suggestion IA ─────────────────────────────────────────────────────────
+  const handleAI = async () => {
+    setAiLoading(true);
+    setAiText('');
+    const tabInfo  = currentTab?.title || '';
+    const score    = extracted.compliance_score || report?.compliance_score || '?';
+    const maturite = extracted.maturity_level   || report?.maturity_level   || '?';
+    const risk     = extracted.risk_score       || report?.risk_score       || '?';
+    const vulns    = (extracted.annexe8?.vulnerabilites || []).map(v => v.nom).join(', ') || 'non spécifiées';
+
+    const prompt = `Tu es un auditeur sécurité SI expert (ANCS/ISO 27001).
+Génère une ${annType} courte (2-3 phrases max, en français, sans introduction) 
+pour l'annexe "${tabInfo}" du rapport d'audit de l'organisme "${report?.organism_name || 'N/A'}"
+(score conformité: ${score}%, maturité: ${maturite}/5, risque: ${risk}).
+Vulnérabilités identifiées: ${vulns}.
+Retourne UNIQUEMENT le texte de la ${annType}.`;
+
+    try {
+      const res  = await fetch('https://api.anthropic.com/v1/messages', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          model:      'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages:   [{ role: 'user', content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      const text = (data.content || [])
+        .filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join(' ')
+        .trim();
+      setAiText(text);
+    } catch (e) {
+      setAiText('Erreur lors de la génération IA. Veuillez réessayer.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // ── Export ────────────────────────────────────────────────────────────────
+  const handleExport = () => {
+    const lines = [
+      `RAPPORT D'AUDIT — ANNOTATIONS`,
+      `Organisme : ${report?.organism_name || 'N/A'}`,
+      `Rapport   : #${report?.id}`,
+      `Export    : ${new Date().toLocaleDateString('fr-FR')}`,
+      '', '---', '',
+    ];
+    annotations.forEach(a => {
+      lines.push(`[${a.type.toUpperCase()}] ${a.target}`);
+      lines.push(a.text);
+      lines.push(`— ${a.author}, ${a.created_at?.split('T')[0] || ''}`);
+      lines.push('');
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url  = URL.createObjectURL(blob);
+    const lnk  = document.createElement('a');
+    lnk.href   = url;
+    lnk.download = `annotations_${report?.id}_${report?.organism_name?.replace(/\s+/g, '_')}.txt`;
+    lnk.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const showToast = (msg, err = false) => {
+    setToast({ msg, err });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const stats = useMemo(() => {
-    const total = fields.length;
-    const verified = fields.filter(f => f.status === 'verified').length;
-    const needsRev = fields.filter(f => f.status === 'needs-review').length;
-    const corrected = fields.filter(f => f.status === 'corrected').length;
-    const flagged = fields.filter(f => f.status === 'flagged').length;
-    const avgConf = total ? Math.round(fields.reduce((s, f) => s + (f.confidence || 0), 0) / total) : 0;
-    return { total, verified, needsRev, corrected, flagged, avgConf };
-  }, [fields]);
+  // ── Type → css class ──────────────────────────────────────────────────────
+  const typeClass  = t => t === 'remarque' ? 'type-r' : t === 'reserve' ? 'type-v' : 'type-c';
+  const typeLabel  = t => t === 'remarque' ? 'Remarque' : t === 'reserve' ? 'Réserve' : 'Recommandation';
+  const annClass   = t => `tri-ann-item ann-${t}`;
 
-  const grouped = useMemo(() => {
-    const shown = filter === 'all' ? fields : fields.filter(f => f.status === filter);
-    const g = {};
-    shown.forEach(f => { (g[f.category] = g[f.category] || []).push(f); });
-    return g;
-  }, [fields, filter]);
-
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="tri-root" style={{ minHeight: '100vh', background: T.bg, display: 'flex', flexDirection: 'column' }}>
+    <div className="tri-wrap">
+      {/* ── Toast ── */}
       {toast && (
-        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 9999, background: `${toast.color}18`, border: `1px solid ${toast.color}40`, borderRadius: 12, padding: '12px 20px', color: toast.color, fontWeight: 600, fontSize: 13, boxShadow: '0 8px 24px rgba(0,0,0,.4)', animation: 'tri-fadeUp .3s both' }}>
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24,
+          padding: '12px 20px', borderRadius: 8,
+          background: toast.err ? '#ef4444' : '#10b981',
+          color: '#fff', fontSize: 14, fontWeight: 500,
+          zIndex: 1200,
+          animation: 'slideIn 0.3s ease',
+        }}>
           {toast.msg}
         </div>
       )}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 'calc(100vh - 64px)' }}>
-        <aside style={{ width: sidebarOpen ? 320 : 0, minWidth: sidebarOpen ? 320 : 0, borderRight: `1px solid ${T.border}`, background: 'rgba(0,0,0,.2)', display: 'flex', flexDirection: 'column', transition: 'all .3s', overflow: 'hidden' }}>
-          <div style={{ padding: '20px 20px 14px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 13, fontWeight: 700, color: '#e2f0ff' }}>Rapports à réviser</div>
-              <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{reports.length} rapport{reports.length !== 1 ? 's' : ''} disponible{reports.length !== 1 ? 's' : ''}</div>
-            </div>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
-            {loadingList && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[1, 2, 3, 4].map(i => <Skeleton key={i} h={62} />)}</div>}
-            {errorList && <div style={{ padding: 16, textAlign: 'center', color: T.red, fontSize: 12 }}>⚠ Erreur : {errorList}</div>}
-            {!loadingList && !errorList && <ReportSelector reports={reports} selectedId={selectedReport?.id} onSelect={handleSelect} />}
-          </div>
-        </aside>
-        <main style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '16px 24px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(0,0,0,.15)', position: 'sticky', top: 0, zIndex: 100, backdropFilter: 'blur(8px)' }}>
-            <button className="tri-btn tri-btn-ghost tri-btn-sm" onClick={() => setSidebarOpen(o => !o)}>{sidebarOpen ? '◀ Masquer' : '▶ Rapports'}</button>
-            {selectedReport && (
+
+      {/* ══════════════════════════════════════════
+          LEFT — données extraites
+      ══════════════════════════════════════════ */}
+      <div className="tri-data-card">
+        <div className="tri-tabs">
+          {ANNEX_TABS.map(t => (
+            <button
+              key={t.n}
+              className={`tri-tab ${activeTab === t.n ? 'active' : ''}`}
+              onClick={() => { setActiveTab(t.n); setAnnTarget(`Annexe ${t.n}`); }}
+              title={t.title}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="tri-panel">
+          {currentTab && (() => {
+            const Panel  = currentTab.Component;
+            const data   = extracted[currentTab.key] || {};
+            const status = extracted.annexe_status?.[`annexe${currentTab.n}`];
+            return (
               <>
-                <div style={{ width: 1, height: 20, background: T.border }} />
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#e2f0ff' }}>{selectedReport.organism_name || selectedReport.company_name}</span>
-                  <span style={{ fontSize: 11, color: T.muted, marginLeft: 10 }}>{selectedReport.organism_sector || selectedReport.sector}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+                    A{currentTab.n} — {currentTab.title}
+                  </span>
+                  {status && (
+                    <span className={`tri-badge ${status.status === 'filled' ? 'tri-badge-ok' : status.status === 'partial' ? 'tri-badge-mid' : 'tri-badge-err'}`}>
+                      {status.status === 'filled' ? 'Complet' : status.status === 'partial' ? 'Partiel' : 'Vide'}
+                    </span>
+                  )}
+                  {extracted.compliance_score != null && (
+                    <span style={{ marginLeft: 'auto', fontSize: 12, color: '#64748b' }}>
+                      Score : <Badge score={extracted.compliance_score} />
+                    </span>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="tri-btn tri-btn-ghost tri-btn-sm" onClick={handleExport}>📄 Exporter</button>
-                  <button className="tri-btn tri-btn-ghost tri-btn-sm" onClick={() => navigate(`/rapports/${selectedReport.id}`)}>📋 Voir le rapport</button>
-                  <button className="tri-btn tri-btn-primary tri-btn-sm" onClick={() => handleValidateTechnical(selectedReport.id, { confidence: calculatedConfidence, annotations: collectedAnnotations, corrections: madeCorrections })} disabled={saving || !allCriticalFieldsReviewed || selectedReport.status === 'verified'}>
-                    {saving ? '⏳ Validation...' : '✓ Valider pour Responsable'}
-                  </button>
-                  <button className="tri-btn tri-btn-ghost tri-btn-sm" onClick={handleSaveDraft} disabled={saving}>💾 Enregistrer brouillon</button>
-                </div>
+                <Panel data={data} extracted={extracted} />
               </>
-            )}
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════
+          RIGHT — annotations
+      ══════════════════════════════════════════ */}
+      <div className="tri-ann-card">
+        <div className="tri-ann-head">
+          <h3>Annotations</h3>
+          <span style={{ fontSize: 12, color: '#64748b' }}>{counts.total} au total</span>
+        </div>
+
+        {/* Compteurs */}
+        <div className="tri-counts">
+          <div className="tri-count-box">
+            <div className={`tri-count-n n-r`}>{counts.remarque}</div>
+            <div className="tri-count-l">Remarques</div>
           </div>
-          {!selectedReport ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, color: T.muted }}>
-              <div style={{ fontSize: 48, opacity: .3 }}>📋</div>
-              <p style={{ fontSize: 15, fontWeight: 600 }}>Sélectionnez un rapport à réviser</p>
-              <p style={{ fontSize: 12 }}>Choisissez un rapport dans le panneau de gauche</p>
-            </div>
-          ) : (
-            <div style={{ padding: '24px', flex: 1 }}>
-              <div className="tri-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 24 }}>
-                {[
-                  { label: 'Champs totaux', val: stats.total, color: T.text },
-                  { label: 'Vérifiés', val: stats.verified, color: T.green },
-                  { label: 'À réviser', val: stats.needsRev, color: T.amber },
-                  { label: 'Corrigés', val: stats.corrected, color: T.blue },
-                  { label: 'Confiance moy.', val: `${stats.avgConf}%`, color: T.teal },
-                ].map(({ label, val, color }) => (
-                  <div key={label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: '14px 16px', textAlign: 'center' }}>
-                    <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 22, fontWeight: 900, color, marginBottom: 4 }}>{val}</div>
-                    <div style={{ fontSize: 10, color: T.muted, textTransform: 'uppercase', letterSpacing: '.4px', fontWeight: 600 }}>{label}</div>
-                  </div>
-                ))}
-              </div>
-              {selectedReport.status === 'verified' && (
-                <div style={{ background: `${T.green}0c`, border: `1px solid ${T.green}25`, borderRadius: 16, padding: '12px 20px', marginBottom: 20, textAlign: 'center' }}>
-                  <span style={{ color: T.green, fontWeight: 600 }}>✓ Ce rapport a déjà été validé techniquement et est en attente de validation par le Responsable</span>
-                </div>
-              )}
-              {(() => {
-                const sc = selectedReport.compliance_score || 0;
-                const niv = getNiveau(sc);
-                return (
-                  <div style={{ background: `${niv.color}0c`, border: `1px solid ${niv.color}25`, borderRadius: 16, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 32, fontWeight: 900, color: niv.color, lineHeight: 1 }}>{sc}%</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: '#e2f0ff', fontWeight: 600, marginBottom: 6 }}>Score de conformité — <span style={{ color: niv.color }}>{niv.label}</span></div>
-                      <BarTrack value={sc} color={niv.color} />
-                    </div>
-                    <div style={{ fontSize: 11, color: T.muted, textAlign: 'right' }}>
-                      <div>Rapport : {selectedReport.file_name || '—'}</div>
-                      <div style={{ marginTop: 3, color: selectedReport.status === 'verified' ? T.green : T.amber }}>{selectedReport.status === 'verified' ? 'Vérifié (en attente validation)' : (selectedReport.status || 'En révision')}</div>
-                    </div>
-                  </div>
-                );
-              })()}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
-                {[
-                  { key: 'all', label: 'Tous', count: stats.total },
-                  { key: 'needs-review', label: 'À réviser', count: stats.needsRev },
-                  { key: 'verified', label: 'Vérifiés', count: stats.verified },
-                  { key: 'corrected', label: 'Corrigés', count: stats.corrected },
-                  { key: 'flagged', label: 'Signalés', count: stats.flagged },
-                ].map(({ key, label, count }) => (
-                  <button key={key} className="tri-btn tri-btn-sm" style={{ background: filter === key ? `${T.teal}18` : 'transparent', border: `1px solid ${filter === key ? T.teal : T.border}`, color: filter === key ? T.teal : T.muted }} onClick={() => setFilter(key)}>
-                    {label} <span style={{ opacity: .6 }}>({count})</span>
-                  </button>
-                ))}
-              </div>
-              {!allCriticalFieldsReviewed && fields.length > 0 && (
-                <div style={{ background: `${T.amber}0c`, border: `1px solid ${T.amber}25`, borderRadius: 12, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: T.amber }}>⚠️</span>
-                  <span style={{ fontSize: 12, color: T.amber }}>Il reste {stats.needsRev} champ(s) à réviser avant de pouvoir valider le rapport</span>
-                </div>
-              )}
-              {Object.entries(grouped).map(([cat, catFields]) => (
-                <div key={cat} style={{ marginBottom: 24 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: 13, fontWeight: 700, color: T.teal, textTransform: 'uppercase', letterSpacing: '.6px' }}>{cat}</h3>
-                    <div style={{ flex: 1, height: 1, background: T.border }} />
-                    <span style={{ fontSize: 11, color: T.muted }}>{catFields.length} champ{catFields.length > 1 ? 's' : ''}</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {catFields.map(f => <FieldCard key={f.id} field={f} onStatusChange={handleStatusChange} onSaveEdit={handleSaveEdit} onAddAnnotation={handleAddAnnotation} />)}
-                  </div>
-                </div>
+          <div className="tri-count-box">
+            <div className={`tri-count-n n-v`}>{counts.reserve}</div>
+            <div className="tri-count-l">Réserves</div>
+          </div>
+          <div className="tri-count-box">
+            <div className={`tri-count-n n-c`}>{counts.recommandation}</div>
+            <div className="tri-count-l">Recommand.</div>
+          </div>
+        </div>
+
+        {/* Formulaire */}
+        <div className="tri-form">
+          <div className="tri-form-group">
+            <label className="tri-form-label">Type</label>
+            <select value={annType} onChange={e => setAnnType(e.target.value)}>
+              <option value="remarque">Remarque</option>
+              <option value="reserve">Réserve</option>
+              <option value="recommandation">Recommandation</option>
+            </select>
+          </div>
+
+          <div className="tri-form-group">
+            <label className="tri-form-label">Cible</label>
+            <select value={annTarget} onChange={e => setAnnTarget(e.target.value)}>
+              {ANNEX_TABS.map(t => (
+                <option key={t.n} value={`Annexe ${t.n}`}>A{t.n} — {t.title}</option>
               ))}
-              {Object.keys(grouped).length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: T.muted, fontSize: 13 }}>Aucun champ correspondant au filtre sélectionné</div>}
-              <AnnexesDetails report={selectedReport} />
-              <div className="tri-actions" style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24, paddingTop: 20, borderTop: `1px solid ${T.border}` }}>
-                <button className="tri-btn tri-btn-ghost" onClick={handleExport}>📄 Exporter en JSON</button>
-                <button className="tri-btn tri-btn-ghost" onClick={handleSaveDraft} disabled={saving}>💾 Enregistrer brouillon</button>
-                <button className="tri-btn tri-btn-primary" onClick={() => handleValidateTechnical(selectedReport.id, { confidence: calculatedConfidence, annotations: collectedAnnotations, corrections: madeCorrections })} disabled={saving || !allCriticalFieldsReviewed || selectedReport.status === 'verified'}>
-                  {saving ? '⏳ Validation...' : '✓ Valider pour Responsable'}
+              <option value="Général">Général</option>
+            </select>
+          </div>
+
+          <div className="tri-form-group">
+            <label className="tri-form-label">Texte</label>
+            <textarea
+              value={annText}
+              onChange={e => setAnnText(e.target.value)}
+              placeholder="Saisissez votre annotation…"
+              rows={4}
+            />
+          </div>
+
+          <div className="tri-btn-row">
+            <button className="tri-btn-add" onClick={handleAdd} disabled={saving || !annText.trim()}>
+              {saving ? '…' : '+ Ajouter'}
+            </button>
+            <button className="tri-btn-ai" onClick={handleAI} disabled={aiLoading}>
+              {aiLoading ? '⏳' : '✦ IA'}
+            </button>
+          </div>
+
+          {/* Suggestion IA */}
+          {aiText && !aiLoading && (
+            <div className="tri-ai-box">
+              {aiText}
+              <div>
+                <button className="tri-ai-use" onClick={() => { setAnnText(aiText); setAiText(''); }}>
+                  Utiliser cette suggestion
                 </button>
               </div>
             </div>
           )}
-        </main>
+        </div>
+
+        {/* Liste annotations */}
+        <div className="tri-ann-divider">Annotations ({counts.total})</div>
+
+        {annError && <div className="tri-error">{annError}</div>}
+
+        {annLoading ? (
+          <div className="tri-empty">Chargement…</div>
+        ) : annotations.length === 0 ? (
+          <div className="tri-empty">Aucune annotation pour ce rapport.</div>
+        ) : (
+          <div className="tri-ann-list">
+            {annotations.map(a => (
+              <div key={a.id} className={annClass(a.type)}>
+                <div className={`tri-ann-type ${typeClass(a.type)}`}>{typeLabel(a.type)}</div>
+                <div className="tri-ann-target">📌 {a.target}</div>
+                <div className="tri-ann-text">{a.text}</div>
+                <div className="tri-ann-meta">
+                  {a.created_at?.split('T')[0] || ''} · {a.author}
+                </div>
+                <button className="tri-ann-del" onClick={() => handleDelete(a.id)}>
+                  🗑 Supprimer
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button className="tri-export" onClick={handleExport}>
+          ↓ Exporter les annotations
+        </button>
       </div>
     </div>
   );
