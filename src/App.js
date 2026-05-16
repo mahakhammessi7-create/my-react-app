@@ -45,6 +45,7 @@ function App() {
         <Route path="/client/guide"          element={<GuidePage />}         />
         <Route path="/client/contact"        element={<ContactPage />}       />
         {/* ── Charge d'Étude Dashboard ── */}
+        
         <Route path="/charge-etude/dashboard"  element={<ChargeEtudeDashboard />} />
         <Route path="/charge-etude/profile"    element={<ChargeEtudeProfile />} />
         {/* ── Technical Review Interface ── */}
