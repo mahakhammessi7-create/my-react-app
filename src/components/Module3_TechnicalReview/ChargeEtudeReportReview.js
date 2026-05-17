@@ -291,21 +291,44 @@ const CSS = `
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// ✅ FIXED: Prioritize compliance_details over flat fields
 function normalizeExtracted(report) {
-  const raw =
-    report?.extracted_data ??
-    report?.extractedData ??
-    report?.compliance_details ??
-    {};
-  let parsed = raw;
-  if (typeof raw === 'string') {
-    try { parsed = JSON.parse(raw); } catch { parsed = {}; }
+  // ✅ Priority 1: compliance_details already has annexe1..annexe9 structure
+  const cd = report?.compliance_details;
+  if (cd && typeof cd === 'object') {
+    const hasAnnexKeys = Object.keys(cd).some(k => /^annexe\d/i.test(k));
+    if (hasAnnexKeys) {
+      // Fix annexe2 format
+      if (cd.annexe2 && Array.isArray(cd.annexe2)) {
+        cd.annexe2 = { processus: cd.annexe2 };
+      }
+      return cd; // ← return directly, this is the real data
+    }
   }
-  const hasAnnexKeys = Object.keys(parsed).some(k => /^annexe\d/i.test(k));
-  if (!hasAnnexKeys && Object.keys(parsed).length > 0) return { annexe1: parsed };
-  if (parsed.annexe2 && Array.isArray(parsed.annexe2))
-    parsed.annexe2 = { processus: parsed.annexe2 };
-  return parsed;
+
+  // Priority 2: extracted_data field
+  const raw = report?.extracted_data ?? report?.extractedData ?? null;
+  if (raw != null) {
+    let parsed = raw;
+    if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = {}; } }
+    if (parsed.annexe2 && Array.isArray(parsed.annexe2))
+      parsed.annexe2 = { processus: parsed.annexe2 };
+    const hasAnnex = Object.keys(parsed).some(k => /^annexe\d/i.test(k));
+    if (hasAnnex) return parsed;
+  }
+
+  // Priority 3: build from flat fields (fallback for PDF reports)
+  return {
+    annexe1: {
+      nom_organisme: report?.organism_name?.trim(),
+      secteur_activite: report?.organism_sector,
+      adresse: report?.organism_address,
+    },
+    annexe6: {
+      maturite: report?.maturity_level,
+      criteres: [],
+    },
+  };
 }
 
 function ciaBadge(v) {

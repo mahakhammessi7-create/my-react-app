@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-
+import API from '../../services/api'; // adjust path as needed
 /* ─── STYLES ────────────────────────────────────────────────────────────────── */
 
 const CSS = `
@@ -104,15 +104,9 @@ const NAV_LINKS = [
  *   PATCH  /api/notifications/read-all → tout marquer comme lu
  * ─────────────────────────────────────────────────────────────────────────── */
 
-const API_BASE = '/api/notifications';
 
-function authHeaders() {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
+
+
 
 /* Normalise les champs de la BDD vers le format attendu par les composants.
  *
@@ -136,17 +130,10 @@ function normalizeNotif(row) {
 }
 
 async function apiFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: authHeaders(),
-    ...options,
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  return res.json();
+  const method = options.method?.toLowerCase() || 'get';
+  const res = await API[method](`/notifications${path}`);
+  return res.data;
 }
-
 /* ─── HELPERS ────────────────────────────────────────────────────────────────── */
 
 function fmtDate(iso) {

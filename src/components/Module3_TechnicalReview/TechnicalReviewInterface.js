@@ -39,7 +39,7 @@ const CSS = `
 .tri-raw-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .tri-raw-row:last-child { border-bottom: none; }
 .tri-raw-label { color: #64748b; min-width: 140px; flex-shrink: 0; }
-.tri-raw-value { color: #e2e8f0; text-align: right; word-break: break-all; }
+.tri-raw-value { color: #e2e8f0; text-align: right; word-break: break-all; } 
 .tri-raw-value.bool-true  { color: #34d399; font-weight: 600; }
 .tri-raw-value.bool-false { color: #f87171; font-weight: 600; }
 .tri-raw-value.num { color: #a78bfa; font-weight: 600; }
@@ -110,80 +110,37 @@ const CSS = `
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function normalizeExtracted(report, annexesOverride = null) {
-  if (annexesOverride && Object.keys(annexesOverride).length > 0) {
-    const parsed = { ...annexesOverride };
-    if (parsed.annexe2) parsed.annexe2 = normalizeAnnexe2(parsed.annexe2);
-    return parsed;
+function normalizeExtracted(report) {
+  const cd = report?.compliance_details;
+  if (cd && typeof cd === 'object') {
+    const hasAnnexKeys = Object.keys(cd).some(k => /^annexe\d/i.test(k));
+    if (hasAnnexKeys) {
+      if (cd.annexe2 && Array.isArray(cd.annexe2)) {
+        cd.annexe2 = { processus: cd.annexe2 };
+      }
+      return cd;
+    }
   }
-
   const raw = report?.extracted_data ?? report?.extractedData ?? null;
   if (raw != null) {
     let parsed = raw;
     if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = {}; } }
-    if (parsed.annexe2) parsed.annexe2 = normalizeAnnexe2(parsed.annexe2);
+    if (parsed.annexe2 && Array.isArray(parsed.annexe2))
+      parsed.annexe2 = { processus: parsed.annexe2 };
     const hasAnnex = Object.keys(parsed).some(k => /^annexe\d/i.test(k));
-    if (!hasAnnex && Object.keys(parsed).length > 0) return { annexe1: parsed };
-    return parsed;
+    if (hasAnnex) return parsed;
   }
-
-  const cd = report?.compliance_details;
-  let cdP = cd;
-  if (typeof cd === 'string') { try { cdP = JSON.parse(cd); } catch { cdP = {}; } }
-
-  if (cdP?.company) {
-    return {
-      annexe1: cdP.company,
-      annexe_kpis: cdP.kpis || {},
-    };
-  }
-
-  // Fallback: build from flat report fields
-  const annexe1 = {};
-  const ROOT_A1 = ['organism_name','company_name','organism_sector','organism_address',
-    'audit_type','maturity_level','compliance_score','is_compliant','risk_score',
-    'upload_date','validation_date','status','security_committee'];
-  for (const k of ROOT_A1) { if (report?.[k] != null) annexe1[k] = report[k]; }
-
-  const annexe3 = {
-    serveurs: report?.total_servers ? [{ nom: `${report.total_servers} serveur(s)`, os: '—', role: '—' }] : [],
-    applications: report?.total_workstations || 0,
-    infrastructure_reseau: [],
-    eol_workstations: report?.eol_workstations,
-    eol_servers: report?.eol_servers,
-    patch_compliance: report?.patch_compliance_pct,
+  return {
+    annexe1: {
+      nom_organisme: report?.organism_name?.trim(),
+      secteur_activite: report?.organism_sector,
+      adresse: report?.organism_address,
+    },
+    annexe6: {
+      maturite: report?.maturity_level,
+      criteres: [],
+    },
   };
-
-  const annexe6 = {
-    maturite: report?.maturity_level,
-    criteres: [
-      { domaine: 'Conformité', critere: 'Score global', score: report?.compliance_score ? Math.round(report.compliance_score / 20) : null },
-      { domaine: 'Risque',     critere: 'Score risque',  score: report?.risk_score ? Math.round((100 - report.risk_score) / 20) : null },
-      { domaine: 'Sécurité',   critere: 'Comité sécu',   score: report?.security_committee ? 4 : 1 },
-      { domaine: 'Formation',  critere: 'Personnel SSI', score: report?.staff_ssi_trained_pct ? Math.round(report.staff_ssi_trained_pct / 25) : null },
-    ].filter(c => c.score != null),
-  };
-
-  const annexe8 = {
-    vulnerabilites: [
-      report?.vuln_scan_done === false && { nom: 'Scan de vulnérabilités non effectué', impact: 'Élevé', recommandation: 'Planifier un scan' },
-      report?.critical_vulns_open > 0 && { nom: `${report.critical_vulns_open} vulnérabilité(s) critique(s)`, impact: 'Critique', recommandation: 'Corriger en priorité' },
-      report?.eol_workstations > 0 && { nom: `${report.eol_workstations} poste(s) en fin de vie`, impact: 'Moyen', recommandation: 'Planifier remplacement' },
-      report?.eol_servers > 0 && { nom: `${report.eol_servers} serveur(s) en fin de vie`, impact: 'Élevé', recommandation: 'Migration urgente' },
-    ].filter(Boolean),
-  };
-
-  const annexe9 = {
-    projets: [{ actions: [
-      report?.vuln_scan_done === false && { action: 'Réaliser un scan de vulnérabilités', priorite: 'P1', responsable: 'RSSI', date_prevue: '—' },
-      report?.pca_test_done === false && { action: 'Tester le PCA/PRA', priorite: 'P1', responsable: 'DSI', date_prevue: '—' },
-      report?.has_rssi === false && { action: 'Nommer un RSSI', priorite: 'P1', responsable: 'Direction', date_prevue: '—' },
-      report?.mfa_enabled === false && { action: 'Déployer MFA', priorite: 'P2', responsable: 'DSI', date_prevue: '—' },
-      report?.encryption_at_rest === false && { action: 'Chiffrement au repos', priorite: 'P2', responsable: 'DSI', date_prevue: '—' },
-    ].filter(Boolean) }],
-  };
-
-  return { annexe1, annexe3, annexe6, annexe8, annexe9 };
 }
 
 function normalizeAnnexe2(a2Raw) {
@@ -291,7 +248,20 @@ function AnnexeSection({ title, icon, children, defaultOpen = false }) {
 }
 
 function LeftAnnexesViewer({ report }) {
-  if (!report) return <div className="tri-empty">Aucun rapport sélectionné.</div>;
+  // ✅ Merge compliance_details.annexe1 into report for display
+  const cd = report?.compliance_details || {};
+  const a1 = cd.annexe1 || {};
+  
+  // Create enriched report that prioritizes compliance_details
+  const enriched = {
+    ...report,
+    organism_name: (a1.nom_organisme || report?.organism_name || '').trim(),
+    organism_sector: a1.secteur_activite || report?.organism_sector,
+    organism_address: a1.adresse || report?.organism_address,
+    audit_type: a1.type_audit || report?.audit_type,
+  };
+  
+  if (!enriched) return <div className="tri-empty">Aucun rapport sélectionné.</div>;
 
   return (
     <div>
@@ -299,9 +269,9 @@ function LeftAnnexesViewer({ report }) {
       <AnnexeSection title="A1 — Identification de l'organisme" icon="🏢" defaultOpen={true}>
         <div className="tri-raw-kv">
           {Object.entries(TEXT_LABELS).map(([k, label]) =>
-            report[k] != null ? <RawTextRow key={k} label={label} value={String(report[k])} /> : null
+            enriched[k] != null ? <RawTextRow key={k} label={label} value={String(enriched[k])} /> : null
           )}
-          {report?.compliance_details?.company && Object.entries(report.compliance_details.company).map(([k, v]) =>
+          {cd?.company && Object.entries(cd.company).map(([k, v]) =>
             typeof v === 'string' || typeof v === 'number'
               ? <RawTextRow key={k} label={k.replace(/_/g, ' ')} value={String(v)} />
               : null
@@ -309,8 +279,8 @@ function LeftAnnexesViewer({ report }) {
         </div>
       </AnnexeSection>
 
-      {/* A2 — Classification (if present in compliance_details) */}
-      {report?.compliance_details?.processus?.length > 0 && (
+      {/* A2 — Classification */}
+      {cd?.processus?.length > 0 && (
         <AnnexeSection title="A2 — Classification des processus" icon="📊">
           <table className="tri-raw-table">
             <thead>
@@ -322,7 +292,7 @@ function LeftAnnexesViewer({ report }) {
               </tr>
             </thead>
             <tbody>
-              {report.compliance_details.processus.map((p, i) => (
+              {cd.processus.map((p, i) => (
                 <tr key={i}>
                   <td>{p.processus || p.p || '—'}</td>
                   <td>{p.confidentialite ?? p.c ?? '—'}</td>
@@ -338,49 +308,49 @@ function LeftAnnexesViewer({ report }) {
       {/* A3 — Infrastructure */}
       <AnnexeSection title="A3 — Système d'information" icon="🖥️">
         <div className="tri-raw-kv">
-          <RawNumRow label="Nb total serveurs"    value={report?.total_servers} />
-          <RawNumRow label="Nb postes de travail" value={report?.total_workstations} />
-          <RawNumRow label="Postes fin de vie"    value={report?.eol_workstations} />
-          <RawNumRow label="Serveurs fin de vie"  value={report?.eol_servers} />
-          <RawNumRow label="Nb utilisateurs"      value={report?.user_count} />
-          <RawNumRow label="Systèmes critiques"   value={report?.critical_systems_covered} />
-          <RawNumRow label="Patch compliance"     value={report?.patch_compliance_pct} suffix="%" />
-          <RawNumRow label="Couverture antivirus" value={report?.antivirus_coverage_pct} suffix="%" />
-          <RawBoolRow label="Inventaire actifs"   value={report?.asset_inventory_done} />
-          <RawBoolRow label="Segmentation réseau" value={report?.network_segmentation} />
+          <RawNumRow label="Nb total serveurs"    value={enriched?.total_servers} />
+          <RawNumRow label="Nb postes de travail" value={enriched?.total_workstations} />
+          <RawNumRow label="Postes fin de vie"    value={enriched?.eol_workstations} />
+          <RawNumRow label="Serveurs fin de vie"  value={enriched?.eol_servers} />
+          <RawNumRow label="Nb utilisateurs"      value={enriched?.user_count} />
+          <RawNumRow label="Systèmes critiques"   value={enriched?.critical_systems_covered} />
+          <RawNumRow label="Patch compliance"     value={enriched?.patch_compliance_pct} suffix="%" />
+          <RawNumRow label="Couverture antivirus" value={enriched?.antivirus_coverage_pct} suffix="%" />
+          <RawBoolRow label="Inventaire actifs"   value={enriched?.asset_inventory_done} />
+          <RawBoolRow label="Segmentation réseau" value={enriched?.network_segmentation} />
         </div>
       </AnnexeSection>
 
       {/* A5 — Sécurité opérationnelle */}
       <AnnexeSection title="A5 — Sécurité opérationnelle" icon="🔐">
         <div className="tri-raw-kv">
-          <RawBoolRow label="RSSI nommé"          value={report?.has_rssi} />
-          <RawBoolRow label="PSSI en place"       value={report?.has_pssi} />
-          <RawBoolRow label="PSSI à jour (2 ans)" value={report?.pssi_updated_within_2y} />
-          <RawBoolRow label="Analyse de risques"  value={report?.has_risk_analysis} />
-          <RawBoolRow label="Comité de sécurité"  value={report?.security_committee} />
-          <RawNumRow  label="Budget sécurité"     value={report?.security_budget} />
-          <RawNumRow  label="% Personnel SSI formé" value={report?.staff_ssi_trained_pct} suffix="%" />
-          <RawBoolRow label="MFA activé"          value={report?.mfa_enabled} />
-          <RawBoolRow label="Chiffrement repos"   value={report?.encryption_at_rest} />
-          <RawBoolRow label="Chiffrement transit" value={report?.encryption_in_transit} />
-          <RawBoolRow label="IDS/IPS"             value={report?.has_ids_ips} />
-          <RawBoolRow label="Pare-feu"            value={report?.has_firewall} />
-          <RawNumRow  label="Couverture SIEM"     value={report?.siem_coverage_pct} suffix="%" />
+          <RawBoolRow label="RSSI nommé"          value={enriched?.has_rssi} />
+          <RawBoolRow label="PSSI en place"       value={enriched?.has_pssi} />
+          <RawBoolRow label="PSSI à jour (2 ans)" value={enriched?.pssi_updated_within_2y} />
+          <RawBoolRow label="Analyse de risques"  value={enriched?.has_risk_analysis} />
+          <RawBoolRow label="Comité de sécurité"  value={enriched?.security_committee} />
+          <RawNumRow  label="Budget sécurité"     value={enriched?.security_budget} />
+          <RawNumRow  label="% Personnel SSI formé" value={enriched?.staff_ssi_trained_pct} suffix="%" />
+          <RawBoolRow label="MFA activé"          value={enriched?.mfa_enabled} />
+          <RawBoolRow label="Chiffrement repos"   value={enriched?.encryption_at_rest} />
+          <RawBoolRow label="Chiffrement transit" value={enriched?.encryption_in_transit} />
+          <RawBoolRow label="IDS/IPS"             value={enriched?.has_ids_ips} />
+          <RawBoolRow label="Pare-feu"            value={enriched?.has_firewall} />
+          <RawNumRow  label="Couverture SIEM"     value={enriched?.siem_coverage_pct} suffix="%" />
         </div>
       </AnnexeSection>
 
       {/* A6 — Maturité */}
       <AnnexeSection title="A6 — Maturité de la sécurité" icon="📈">
         <div className="tri-raw-kv">
-          <RawNumRow label="Niveau maturité"    value={report?.maturity_level} suffix="/5" />
-          <RawNumRow label="Score conformité"   value={report?.compliance_score} suffix="%" />
-          <RawNumRow label="Score risque"       value={report?.risk_score} suffix="/100" />
-          <RawTextRow label="Statut conformité" value={report?.is_compliant ? 'Conforme' : 'Non conforme'} />
-          {report?.compliance_details?.kpis && (
+          <RawNumRow label="Niveau maturité"    value={enriched?.maturity_level} suffix="/5" />
+          <RawNumRow label="Score conformité"   value={enriched?.compliance_score} suffix="%" />
+          <RawNumRow label="Score risque"       value={enriched?.risk_score} suffix="/100" />
+          <RawTextRow label="Statut conformité" value={enriched?.is_compliant ? 'Conforme' : 'Non conforme'} />
+          {cd?.kpis && (
             <>
-              <RawNumRow label="KPIs total"    value={report.compliance_details.kpis.total} />
-              <RawNumRow label="KPIs conformes" value={report.compliance_details.kpis.conformes} />
+              <RawNumRow label="KPIs total"    value={cd.kpis.total} />
+              <RawNumRow label="KPIs conformes" value={cd.kpis.conformes} />
             </>
           )}
         </div>
@@ -389,73 +359,77 @@ function LeftAnnexesViewer({ report }) {
       {/* A7 — Continuité */}
       <AnnexeSection title="A7 — Continuité & Sauvegarde" icon="💾">
         <div className="tri-raw-kv">
-          <RawBoolRow label="PCA existe"            value={report?.has_pca} />
-          <RawBoolRow label="PRA existe"            value={report?.has_pra} />
-          <RawBoolRow label="PCA testé"             value={report?.pca_test_done} />
-          <RawTextRow label="Dernier test PCA"      value={report?.pca_last_test_date} />
-          <RawNumRow  label="RTO (heures)"          value={report?.rto_hours} />
-          <RawNumRow  label="RPO (heures)"          value={report?.rpo_hours} />
-          <RawBoolRow label="Politique sauvegarde"  value={report?.backup_policy_exists} />
-          <RawBoolRow label="Sauvegarde testée"     value={report?.backup_tested} />
-          <RawBoolRow label="Sauvegarde hors-site"  value={report?.backup_offsite} />
-          <RawBoolRow label="Sauvegarde chiffrée"   value={report?.backup_encrypted} />
-          <RawNumRow  label="Rétention (jours)"     value={report?.backup_retention_days} />
-          <RawNumRow  label="Couverture sauvegarde" value={report?.backup_coverage_pct} suffix="%" />
-          <RawNumRow  label="% Tests restauration"  value={report?.restore_test_success_pct} suffix="%" />
+          <RawBoolRow label="PCA existe"            value={enriched?.has_pca} />
+          <RawBoolRow label="PRA existe"            value={enriched?.has_pra} />
+          <RawBoolRow label="PCA testé"             value={enriched?.pca_test_done} />
+          <RawTextRow label="Dernier test PCA"      value={enriched?.pca_last_test_date} />
+          <RawNumRow  label="RTO (heures)"          value={enriched?.rto_hours} />
+          <RawNumRow  label="RPO (heures)"          value={enriched?.rpo_hours} />
+          <RawBoolRow label="Politique sauvegarde"  value={enriched?.backup_policy_exists} />
+          <RawBoolRow label="Sauvegarde testée"     value={enriched?.backup_tested} />
+          <RawBoolRow label="Sauvegarde hors-site"  value={enriched?.backup_offsite} />
+          <RawBoolRow label="Sauvegarde chiffrée"   value={enriched?.backup_encrypted} />
+          <RawNumRow  label="Rétention (jours)"     value={enriched?.backup_retention_days} />
+          <RawNumRow  label="Couverture sauvegarde" value={enriched?.backup_coverage_pct} suffix="%" />
+          <RawNumRow  label="% Tests restauration"  value={enriched?.restore_test_success_pct} suffix="%" />
         </div>
       </AnnexeSection>
 
       {/* A8 — Vulnérabilités */}
       <AnnexeSection title="A8 — Vulnérabilités & Incidents" icon="⚠️">
         <div className="tri-raw-kv">
-          <RawBoolRow label="Scan vulns effectué"   value={report?.vuln_scan_done} />
-          <RawTextRow label="Date scan vulns"       value={report?.vuln_scan_date} />
-          <RawNumRow  label="Vulns critiques ouvertes" value={report?.critical_vulns_open} />
-          <RawBoolRow label="Pentest effectué"      value={report?.pentest_done} />
-          <RawTextRow label="Date dernier pentest"  value={report?.pentest_date} />
-          <RawNumRow  label="Nb incidents"          value={report?.incidents_count} />
-          <RawNumRow  label="% Incidents résolus"   value={report?.incidents_resolved_pct} suffix="%" />
+          <RawBoolRow label="Scan vulns effectué"   value={enriched?.vuln_scan_done} />
+          <RawTextRow label="Date scan vulns"       value={enriched?.vuln_scan_date} />
+          <RawNumRow  label="Vulns critiques ouvertes" value={enriched?.critical_vulns_open} />
+          <RawBoolRow label="Pentest effectué"      value={enriched?.pentest_done} />
+          <RawTextRow label="Date dernier pentest"  value={enriched?.pentest_date} />
+          <RawNumRow  label="Nb incidents"          value={enriched?.incidents_count} />
+          <RawNumRow  label="% Incidents résolus"   value={enriched?.incidents_resolved_pct} suffix="%" />
         </div>
       </AnnexeSection>
 
       {/* A9 — Conformité réglementaire */}
       <AnnexeSection title="A9 — Conformité & Gouvernance" icon="📋">
         <div className="tri-raw-kv">
-          <RawBoolRow label="ISO 27001 certifié"    value={report?.iso27001_certified} />
-          <RawTextRow label="Date certification"    value={report?.iso27001_date} />
-          <RawBoolRow label="Conforme réglementaire" value={report?.regulatory_compliant} />
-          <RawBoolRow label="Classification données" value={report?.data_classification} />
-          <RawBoolRow label="DPO nommé (RGPD)"      value={report?.gdpr_dpo_appointed} />
-          <RawBoolRow label="Audit interne effectué" value={report?.audit_internal_done} />
-          <RawTextRow label="Date audit interne"    value={report?.audit_internal_date} />
-          <RawTextRow label="Dernier audit"         value={report?.last_audit_date} />
-          <RawTextRow label="Prochain audit"        value={report?.next_audit_date} />
-          <RawTextRow label="Historique corrections" value={report?.correction_history} />
+          <RawBoolRow label="ISO 27001 certifié"    value={enriched?.iso27001_certified} />
+          <RawTextRow label="Date certification"    value={enriched?.iso27001_date} />
+          <RawBoolRow label="Conforme réglementaire" value={enriched?.regulatory_compliant} />
+          <RawBoolRow label="Classification données" value={enriched?.data_classification} />
+          <RawBoolRow label="DPO nommé (RGPD)"      value={enriched?.gdpr_dpo_appointed} />
+          <RawBoolRow label="Audit interne effectué" value={enriched?.audit_internal_done} />
+          <RawTextRow label="Date audit interne"    value={enriched?.audit_internal_date} />
+          <RawTextRow label="Dernier audit"         value={enriched?.last_audit_date} />
+          <RawTextRow label="Prochain audit"        value={enriched?.next_audit_date} />
+          <RawTextRow label="Historique corrections" value={enriched?.correction_history} />
         </div>
       </AnnexeSection>
 
       {/* Datacenter */}
       <AnnexeSection title="Datacenter" icon="🏭">
         <div className="tri-raw-kv">
-          <RawBoolRow label="Datacenter propre"       value={report?.has_datacenter} />
-          <RawNumRow  label="Tier datacenter"         value={report?.dc_tier_level} />
-          <RawBoolRow label="Contrôle accès"          value={report?.dc_access_control} />
-          <RawBoolRow label="Anti-incendie"           value={report?.dc_fire_suppression} />
-          <RawBoolRow label="UPS redondant"           value={report?.dc_ups_redundancy} />
-          <RawBoolRow label="Refroidissement redondant" value={report?.dc_cooling_redundancy} />
-          <RawBoolRow label="CCTV"                    value={report?.dc_cctv} />
+          <RawBoolRow label="Datacenter propre"       value={enriched?.has_datacenter} />
+          <RawNumRow  label="Tier datacenter"         value={enriched?.dc_tier_level} />
+          <RawBoolRow label="Contrôle accès"          value={enriched?.dc_access_control} />
+          <RawBoolRow label="Anti-incendie"           value={enriched?.dc_fire_suppression} />
+          <RawBoolRow label="UPS redondant"           value={enriched?.dc_ups_redundancy} />
+          <RawBoolRow label="Refroidissement redondant" value={enriched?.dc_cooling_redundancy} />
+          <RawBoolRow label="CCTV"                    value={enriched?.dc_cctv} />
         </div>
       </AnnexeSection>
     </div>
   );
 }
 
-// ─── Right panel: Synthesis Panel (replaces all tab panels) ──────────────────────────────────────
+// ─── Right panel: Synthesis Panel ──────────────────────────────────────────────
 
 function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
+  // ✅ Extract from compliance_details first, with fallback to flat fields
   const cd = report?.compliance_details || {};
-  const company = cd.company || {};
-
+  const a1 = cd.annexe1 || {};
+  const a3 = cd.annexe3 || {};
+  const a6 = cd.annexe6 || {};
+  const a7 = cd.annexe7 || {};
+  
   const sections = [
     {
       key: 'organisme',
@@ -463,15 +437,15 @@ function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
       annexe: "Annexe 1",
       icon: "🏢",
       fields: [
-        { label: "Nom",             value: report?.organism_name || company.nom_organisme || company.name },
-        { label: "Acronyme",        value: company.acronyme },
-        { label: "Secteur",         value: report?.organism_sector || company.sector || company.secteur_activite },
-        { label: "Statut juridique",value: company.statut },
-        { label: "Email",           value: company.adresse_email || company.email },
-        { label: "Site web",        value: company.site_web },
-        { label: "Responsable",     value: company.responsable },
-        { label: "Type d'audit",    value: report?.audit_type },
-        { label: "Date dépôt",      value: report?.upload_date },
+        { label: "Nom", value: (a1.nom_organisme || report?.organism_name || '').trim() },
+        { label: "Acronyme", value: a1.acronyme },
+        { label: "Secteur", value: a1.secteur_activite || report?.organism_sector },
+        { label: "Statut juridique", value: a1.statut },
+        { label: "Email", value: a1.adresse_email || a1.email },
+        { label: "Site web", value: a1.site_web },
+        { label: "Responsable", value: a1.responsable },
+        { label: "Type d'audit", value: a1.type_audit || report?.audit_type },
+        { label: "Date dépôt", value: report?.upload_date ? new Date(report.upload_date).toLocaleDateString('fr-FR') : null },
       ],
     },
     {
@@ -480,11 +454,10 @@ function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
       annexe: "Annexe 1 / Annexe 3",
       icon: "📍",
       fields: [
-        { label: "Adresse",               value: report?.organism_address || company.adresse },
-        { label: "Ville",                 value: company.ville },
-        { label: "Siège social",          value: company.headquarters },
-        { label: "Nombre de sites",       value: company.nombre_sites },
-        { label: "Répartition géo.",      value: company.repartition_geo },
+        { label: "Adresse", value: a1.adresse || report?.organism_address },
+        { label: "Ville", value: a1.ville },
+        { label: "Siège social", value: a1.headquarters },
+        { label: "Nombre de sites", value: a1.nombre_sites },
       ],
     },
     {
@@ -493,15 +466,15 @@ function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
       annexe: "Annexe 3",
       icon: "🖥️",
       fields: [
-        { label: "Nb serveurs",           value: report?.total_servers },
-        { label: "Nb postes de travail",  value: report?.total_workstations },
-        { label: "Nb utilisateurs",       value: report?.user_count },
-        { label: "Postes fin de vie",     value: report?.eol_workstations },
-        { label: "Serveurs fin de vie",   value: report?.eol_servers },
-        { label: "Patch compliance",      value: report?.patch_compliance_pct != null ? `${report.patch_compliance_pct}%` : null },
-        { label: "Couverture antivirus",  value: report?.antivirus_coverage_pct != null ? `${report.antivirus_coverage_pct}%` : null },
-        { label: "Segmentation réseau",   value: report?.network_segmentation === true ? "✅ Oui" : report?.network_segmentation === false ? "❌ Non" : null },
-        { label: "Inventaire actifs",     value: report?.asset_inventory_done === true ? "✅ Oui" : report?.asset_inventory_done === false ? "❌ Non" : null },
+        { label: "Nb serveurs", value: a3.serveurs?.length || report?.total_servers },
+        { label: "Nb postes de travail", value: report?.total_workstations },
+        { label: "Nb utilisateurs", value: report?.user_count },
+        { label: "Postes fin de vie", value: report?.eol_workstations },
+        { label: "Serveurs fin de vie", value: report?.eol_servers },
+        { label: "Patch compliance", value: report?.patch_compliance_pct != null ? `${report.patch_compliance_pct}%` : null },
+        { label: "Couverture antivirus", value: report?.antivirus_coverage_pct != null ? `${report.antivirus_coverage_pct}%` : null },
+        { label: "Segmentation réseau", value: report?.network_segmentation === true ? "✅ Oui" : report?.network_segmentation === false ? "❌ Non" : null },
+        { label: "Inventaire actifs", value: report?.asset_inventory_done === true ? "✅ Oui" : report?.asset_inventory_done === false ? "❌ Non" : null },
       ],
     },
     {
@@ -510,15 +483,15 @@ function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
       annexe: "Annexe 6",
       icon: "📈",
       fields: [
-        { label: "Niveau maturité global",  value: report?.maturity_level != null ? `${report.maturity_level} / 5` : null },
-        { label: "Score conformité",        value: report?.compliance_score != null ? `${report.compliance_score}%` : null },
-        { label: "Score risque",            value: report?.risk_score != null ? `${report.risk_score} / 100` : null },
-        { label: "Statut conformité",       value: report?.is_compliant === true ? "✅ Conforme" : report?.is_compliant === false ? "❌ Non conforme" : null },
-        { label: "Score Organisationnel",   value: cd.annexe6?.score_organisationnel },
-        { label: "Score Personnes",         value: cd.annexe6?.score_personnes },
-        { label: "Score Physique",          value: cd.annexe6?.score_physique },
-        { label: "Score Technologique",     value: cd.annexe6?.score_technologique },
-        { label: "KPIs conformes",          value: cd.kpis ? `${cd.kpis.conformes} / ${cd.kpis.total}` : null },
+        { label: "Niveau maturité global", value: (a6.maturite ?? report?.maturity_level) != null ? `${a6.maturite ?? report?.maturity_level} / 5` : null },
+        { label: "Score conformité", value: report?.compliance_score != null ? `${report.compliance_score}%` : null },
+        { label: "Score risque", value: report?.risk_score != null ? `${report.risk_score} / 100` : null },
+        { label: "Statut conformité", value: report?.is_compliant === true ? "✅ Conforme" : report?.is_compliant === false ? "❌ Non conforme" : null },
+        { label: "Score Organisationnel", value: a6.score_organisationnel },
+        { label: "Score Personnes", value: a6.score_personnes },
+        { label: "Score Physique", value: a6.score_physique },
+        { label: "Score Technologique", value: a6.score_technologique },
+        { label: "KPIs conformes", value: cd.kpis ? `${cd.kpis.conformes} / ${cd.kpis.total}` : null },
       ],
     },
     {
@@ -527,24 +500,16 @@ function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
       annexe: "Annexe 7",
       icon: "🔐",
       fields: [
-        { label: "RSSI nommé",           value: report?.has_rssi === true ? "✅ Oui" : report?.has_rssi === false ? "❌ Non" : null },
-        { label: "PSSI en place",        value: report?.has_pssi === true ? "✅ Oui" : report?.has_pssi === false ? "❌ Non" : null },
-        { label: "PSSI à jour",          value: report?.pssi_updated_within_2y === true ? "✅ Oui" : report?.pssi_updated_within_2y === false ? "❌ Non" : null },
-        { label: "PCA",                  value: report?.has_pca === true ? "✅ Oui" : report?.has_pca === false ? "❌ Non" : null },
-        { label: "PRA",                  value: report?.has_pra === true ? "✅ Oui" : report?.has_pra === false ? "❌ Non" : null },
-        { label: "PCA testé",            value: report?.pca_test_done === true ? "✅ Oui" : report?.pca_test_done === false ? "❌ Non" : null },
-        { label: "Sauvegardes testées",  value: report?.backup_tested === true ? "✅ Oui" : report?.backup_tested === false ? "❌ Non" : null },
-        { label: "Sauvegarde hors-site", value: report?.backup_offsite === true ? "✅ Oui" : report?.backup_offsite === false ? "❌ Non" : null },
-        { label: "Sauvegarde chiffrée",  value: report?.backup_encrypted === true ? "✅ Oui" : report?.backup_encrypted === false ? "❌ Non" : null },
-        { label: "Antivirus",            value: report?.antivirus_coverage_pct != null ? `${report.antivirus_coverage_pct}%` : null },
-        { label: "SIEM / IDS-IPS",       value: report?.has_ids_ips === true ? "✅ Oui" : report?.has_ids_ips === false ? "❌ Non" : null },
-        { label: "Pare-feu",             value: report?.has_firewall === true ? "✅ Oui" : report?.has_firewall === false ? "❌ Non" : null },
-        { label: "MFA activé",           value: report?.mfa_enabled === true ? "✅ Oui" : report?.mfa_enabled === false ? "❌ Non" : null },
-        { label: "Chiffrement repos",    value: report?.encryption_at_rest === true ? "✅ Oui" : report?.encryption_at_rest === false ? "❌ Non" : null },
-        { label: "Contrôle accès DC",    value: report?.dc_access_control === true ? "✅ Oui" : report?.dc_access_control === false ? "❌ Non" : null },
-        { label: "% Personnel SSI formé",value: report?.staff_ssi_trained_pct != null ? `${report.staff_ssi_trained_pct}%` : null },
-        { label: "Vulns critiques",      value: report?.critical_vulns_open != null ? `${report.critical_vulns_open}` : null },
-      ],
+        ...(a7.indicateurs || []).map(ind => ({
+          label: ind.nom,
+          value: ind.present ? "✅ Oui" : "❌ Non"
+        })),
+        { label: "MFA activé", value: report?.mfa_enabled === true ? "✅ Oui" : report?.mfa_enabled === false ? "❌ Non" : null },
+        { label: "Chiffrement repos", value: report?.encryption_at_rest === true ? "✅ Oui" : report?.encryption_at_rest === false ? "❌ Non" : null },
+        { label: "Chiffrement transit", value: report?.encryption_in_transit === true ? "✅ Oui" : report?.encryption_in_transit === false ? "❌ Non" : null },
+        { label: "Vulns critiques", value: report?.critical_vulns_open != null ? `${report.critical_vulns_open}` : null },
+        { label: "Incidents résolus", value: report?.incidents_resolved_pct != null ? `${report.incidents_resolved_pct}%` : null },
+      ].filter(f => f.value != null),
     },
   ];
 
@@ -611,7 +576,7 @@ function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
   );
 }
 
-// ─── Annotations ─────────────────────────────────────────────────────────────
+// ─── Annotations Panel ─────────────────────────────────────────────────────────
 
 function AnnotationsPanel({ annotations, annLoading, counts, addAnnotation, deleteAnnotation, sendToResponsable, selectedField, clearSelectedField, report }) {
   const [annType, setAnnType] = useState('remarque');
@@ -712,7 +677,7 @@ function AnnotationsPanel({ annotations, annLoading, counts, addAnnotation, dele
   );
 }
 
-// ─── Main Component MODIFIÉ avec gestion onValidate/onReject ─────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function TechnicalReviewInterface({ 
   report, 
@@ -745,7 +710,6 @@ export default function TechnicalReviewInterface({
   const annotatedPaths = new Set(annotations.filter(a => a.field_path).map(a => a.field_path));
   const handleAnnotateField = (path, label) => setSelectedField({ path, label });
 
-  // Gestionnaire pour l'approbation du rapport
   const handleValidate = async () => {
     if (!onValidate || isValidating || validating) return;
     setIsValidating(true);
@@ -764,11 +728,8 @@ export default function TechnicalReviewInterface({
     }
   };
 
-  // Gestionnaire pour le rejet du rapport avec demande de motif
   const handleReject = async () => {
     if (!onReject || isRejecting || rejecting) return;
-    
-    // Demander un motif avant de rejeter
     const reason = prompt('Motif du rejet :', 'Données insuffisantes ou non conformes');
     if (!reason) return;
     
@@ -788,9 +749,11 @@ export default function TechnicalReviewInterface({
     }
   };
 
-  // Vérifier si le rapport est déjà dans un état final
   const isFinalized = report?.status === 'validé' || report?.status === 'rejeté' || report?.status === 'clôturé';
   const isDisabled = isFinalized || isValidating || isRejecting || validating || rejecting;
+  
+  // ✅ Fixed header display: prioritize compliance_details.annexe1.nom_organisme
+  const organismName = (report?.compliance_details?.annexe1?.nom_organisme || report?.organism_name || '—').trim();
 
   return (
     <div className="tri-root">
@@ -802,24 +765,23 @@ export default function TechnicalReviewInterface({
           <div className="tri-card-head">
             <h3>📂 Données brutes du rapport</h3>
             <span style={{ fontSize: 11, color: '#64748b' }}>
-              {report?.organism_name || report?.compliance_details?.company?.name || '—'}
+              {organismName}
             </span>
           </div>
           <LeftAnnexesViewer report={report} />
           
-          {/* Barre d'actions - Conditionnelle selon les props */}
           {onValidate && onReject && (
             <div className="tri-approve-bar">
               <button
-  className="tri-btn-approve"
-  onClick={() => {
-    onValidate(report.id);
-    showToast('📤 Rapport soumis au responsable pour validation finale.');
-  }}
-  disabled={report?.status === 'en_validation' || report?.status === 'validé'}
->
-  {report?.status === 'en_validation' ? '⏳ En attente responsable' : '✓ Soumettre au responsable'}
-</button>
+                className="tri-btn-approve"
+                onClick={() => {
+                  onValidate(report.id);
+                  showToast('📤 Rapport soumis au responsable pour validation finale.');
+                }}
+                disabled={report?.status === 'en_validation' || report?.status === 'validé'}
+              >
+                {report?.status === 'en_validation' ? '⏳ En attente responsable' : '✓ Soumettre au responsable'}
+              </button>
               <button 
                 className="tri-btn-reject-main"
                 onClick={handleReject}
@@ -831,7 +793,6 @@ export default function TechnicalReviewInterface({
             </div>
           )}
           
-          {/* Indicateur de statut si le rapport est finalisé */}
           {isFinalized && (
             <div style={{ 
               padding: '10px 16px', 
@@ -854,7 +815,7 @@ export default function TechnicalReviewInterface({
           <div className="tri-card-head">
             <h3>📊 Données extraites du rapport</h3>
             <span style={{ fontSize: 11, color: '#64748b' }}>
-              {report?.organism_name || report?.compliance_details?.company?.name || '—'}
+              {organismName}
             </span>
           </div>
           <div className="tri-panel">

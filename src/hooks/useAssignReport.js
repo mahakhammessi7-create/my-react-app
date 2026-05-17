@@ -1,155 +1,112 @@
 import { useState, useCallback } from 'react';
 import supabase from '../lib/supabaseClient';
 
+// ─── Central API caller ───────────────────────────────────────────────────────
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+async function apiFetch(path, options = {}) {
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...options,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 export function useAssignReport() {
-  const [assigning,    setAssigning]    = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [chargesEtude, setChargesEtude] = useState([]);
+  const [loadingCharges, setLoadingCharges] = useState(false);
 
-  const user = (() => {
-    try { return JSON.parse(localStorage.getItem('user') || '{}'); }
-    catch { return {}; }
-  })();
-
-  /* ── Helper : insérer une notification ── */
-  const insertNotification = async ({ toUserId, type, title, message, reportId }) => {
-    if (!toUserId) return;
-    await supabase.from('notifications').insert({
-      user_id:           Number(toUserId),     // integer — destinataire
-      type:              String(type).slice(0, 50),
-      title:             String(title).slice(0, 255),
-      message,
-      related_report_id: reportId ? Number(reportId) : null,
-      is_read:           false,
-    });
-  };
-
-  /* ── Fetch chargés d'étude ── */
+  // ── Fetch chargés d'étude from Express backend ───────────────────────────
   const fetchChargesEtude = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, full_name, email, role')
-      .ilike('role', '%charge%')
-      .order('full_name');
-
-    if (error) { console.error('fetchChargesEtude:', error.message); return; }
-
-    // Compter les rapports actifs par chargé
-    const enriched = await Promise.all((data || []).map(async (c) => {
-      const { count } = await supabase
-        .from('reports')
-        .select('id', { count: 'exact', head: true })
-        .eq('assigned_charge', c.id)
-        .not('status', 'in', '("validé","clôturé","rejeté")');
-      return { ...c, active_count: count || 0 };
-    }));
-
-    setChargesEtude(enriched);
+    setLoadingCharges(true);
+    try {
+      const rows = await apiFetch('/reports/charges-etude');
+      const normalized = (rows || []).map(c => ({
+        ...c,
+        active_count: Number(c.rapports_assignes ?? 0),
+      }));
+      setChargesEtude(normalized);
+    } catch (err) {
+      console.error('fetchChargesEtude failed:', err.message);
+    } finally {
+      setLoadingCharges(false);
+    }
   }, []);
 
-  /* ── Assigner un rapport → status: 'assigné' ── */
+  // ── Assign rapport → PATCH /api/reports/:id/assign ───────────────────────
   const assignReport = async (reportId, chargeId) => {
     setAssigning(true);
-    const charge = chargesEtude.find(c => String(c.id) === String(chargeId));
-
-    const { data, error } = await supabase
-      .from('reports')
-      .update({
-        assigned_charge:      Number(chargeId),
-        assigned_charge_name: charge?.full_name || null,
-        assigned_to:          charge?.full_name || null,
-        assigned_at:          new Date().toISOString(),
-        assigned_by:          user.id ? Number(user.id) : null,
-        status:               'assigné',
-      })
-      .eq('id', Number(reportId));
-      
-    if (!error) {
-      await insertNotification({
-        toUserId: chargeId,
-        type:     'rapport_assigné',
-        title:    'Nouveau rapport assigné',
-        message:  `Le rapport #${reportId} vous a été assigné par ${user.full_name || 'le responsable'}.`,
-        reportId,
+    try {
+      const result = await apiFetch(`/reports/${reportId}/assign`, {
+        method: 'PATCH',
+        body: JSON.stringify({ chargeEtudeId: chargeId }),
       });
+      return { success: true, report: result.report || null };
+    } catch (err) {
+      console.error('[assignReport]', err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setAssigning(false);
     }
-
-    setAssigning(false);
-    return { success: !error, error: error?.message };
   };
 
-  /* ── Soumettre un rapport pour validation → status: 'en_validation' ── */
+  // ── Chargé d'étude submits for final review ──────────────────────────────
   const submitToResponsable = async (reportId) => {
-    const { error } = await supabase
-      .from('reports')
-      .update({
-        status:         'en_validation', 
-        validated_at:   new Date().toISOString(),
-        validated_by:   user.id ? Number(user.id) : null,
-        validator_name: user.full_name || null,
-      })
-      .eq('id', Number(reportId));
-
-    if (!error) {
-      // Récupérer l'id du chargé pour notifier
-      const { data: report } = await supabase
-        .from('reports')
-        .select('assigned_charge, company_name')
-        .eq('id', Number(reportId))
-        .single();
-
-      if (report?.assigned_charge) {
-        await insertNotification({
-          toUserId: report.assigned_charge,
-          type:     'rapport_validé',
-          title:    'Rapport validé',
-          message:  `Le rapport "${report.company_name || `#${reportId}`}" a été validé par ${user.full_name || 'le responsable'}.`,
-          reportId,
-        });
-      }
+    try {
+      const result = await apiFetch(`/reports/${reportId}/valider-tech`, {
+        method: 'PATCH',
+      });
+      return { success: true, report: result.report || null };
+    } catch (err) {
+      console.error('[submitToResponsable]', err.message);
+      return { success: false, error: err.message };
     }
-
-    return { success: !error, error: error?.message };
   };
 
-  /* ── Rejeter un rapport → status: 'rejeté' ── */
+  // ── Responsable rejects report ───────────────────────────────────────────
   const rejectReport = async (reportId, reason = '') => {
-    const { error } = await supabase
-      .from('reports')
-      .update({
-        status:           'rejeté',
-        rejected_at:      new Date().toISOString(),
-        rejected_by:      user.id ? Number(user.id) : null,
-        rejection_reason: reason || null,
-      })
-      .eq('id', Number(reportId));
-
-    if (!error) {
-      const { data: report } = await supabase
-        .from('reports')
-        .select('assigned_charge, company_name')
-        .eq('id', Number(reportId))
-        .single();
-
-      if (report?.assigned_charge) {
-        await insertNotification({
-          toUserId: report.assigned_charge,
-          type:     'rapport_rejeté',
-          title:    'Rapport rejeté',
-          message:  `Le rapport "${report.company_name || `#${reportId}`}" a été rejeté${reason ? ` : ${reason}` : ''}.`,
-          reportId,
-        });
-      }
+    try {
+      const result = await apiFetch(`/reports/${reportId}/rejeter`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason }),
+      });
+      return { success: true, report: result.report || null };
+    } catch (err) {
+      console.error('[rejectReport]', err.message);
+      return { success: false, error: err.message };
     }
+  };
 
-    return { success: !error, error: error?.message };
+  // ── Responsable final validation ─────────────────────────────────────────
+  const validateFinal = async (reportId, score = null) => {
+    try {
+      const result = await apiFetch(`/reports/${reportId}/valider-final`, {
+        method: 'PATCH',
+        body: JSON.stringify({ score }),
+      });
+      return { success: true, report: result.report || null };
+    } catch (err) {
+      console.error('[validateFinal]', err.message);
+      return { success: false, error: err.message };
+    }
   };
 
   return {
     assignReport,
     submitToResponsable,
     rejectReport,
+    validateFinal,
     fetchChargesEtude,
     chargesEtude,
+    loadingCharges,
     assigning,
   };
 }

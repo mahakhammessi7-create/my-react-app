@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useReportsRealtime } from "../../hooks/useReportsRealtime";
 import { useAssignReport } from "../../hooks/useAssignReport";
 import supabase from '../../lib/supabaseClient';
 import { ResponsableOperationnelView, ResponsableDecideurView } from './ResponsableComplexDashboard';
@@ -678,14 +677,52 @@ function NewReportToast({ count, onDismiss, onView }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   FETCH PAGINÉ (contourne la limite 1000 lignes de Supabase)
+   → Pagination par ID pour éviter les doublons/omissions
+   → Tri final par upload_date pour l'affichage
+═══════════════════════════════════════════════════════════════════ */
+const fetchAllReports = async () => {
+  const PAGE_SIZE = 1000;
+  let page = 0;
+  let allData = [];
+  let hasMore = true;
+
+  while (hasMore) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .order('id', { ascending: true })  // ← use id for stable pagination
+      .range(from, to);
+
+    if (error) { console.error('Fetch error:', error); break; }
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data];
+      hasMore = data.length === PAGE_SIZE;
+      page++;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  // Sort by upload_date descending after collecting all pages for display
+  return allData.sort((a, b) => 
+    new Date(b.upload_date || b.created_at) - new Date(a.upload_date || a.created_at)
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════
    COMPOSANT PRINCIPAL - RESPONSABLE DASHBOARD
    Architecture: 4 onglets fonctionnels
 ═══════════════════════════════════════════════════════════════════ */
 export default function ResponsableDashboard() {
   const navigate = useNavigate();
 
-  const { reports: realtimeReports, loading: realtimeLoading, newCount, refresh } = useReportsRealtime(null);
-  const { assignReport, rejectReport, fetchChargesEtude, chargesEtude, assigning } = useAssignReport();
+  const { assignReport, rejectReport, validateFinal, fetchChargesEtude, chargesEtude, assigning } = useAssignReport();
+   
   const { published, publishKpi, unpublish } = useSharedDashboard();
 
   const [reports, setReports] = useState([]);
@@ -702,6 +739,9 @@ export default function ResponsableDashboard() {
   const [validated, setValidated] = useState({});
   const [validationChecks, setValidationChecks] = useState({});
   const seenIdsRef = useRef(new Set());
+
+  // NEW: local newCount state
+  const [newCount, setNewCount] = useState(0);
 
   const [kpis, setKpis] = useState([
     { id: 1, name: 'Taux de validation', formula: '(validés / total) × 100', type: 'Taux (%)' },
@@ -723,24 +763,48 @@ export default function ResponsableDashboard() {
     fetchChargesEtude();
   }, [navigate, fetchChargesEtude]);
 
-  // ── SYNC REPORTS ──
-  useEffect(() => {
-    if (!realtimeReports) return;
-    const normalized = realtimeReports.map(normalizeReport);
-    const currentIds = new Set(normalized.map(r => r.id));
-    const brandNewIds = [...currentIds].filter(id => !seenIdsRef.current.has(id));
-    if (seenIdsRef.current.size > 0 && brandNewIds.length > 0) {
-      setToastCount(brandNewIds.length);
-      setShowToast(true);
+  // ── FETCH ALL REPORTS (paginated) ──
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const data = await fetchAllReports();
+    if (data.length > 0) {
+      const normalized = data.map(normalizeReport);
+      setReports(normalized);
+      normalized.forEach(r => seenIdsRef.current.add(r.id));
     }
-    brandNewIds.forEach(id => seenIdsRef.current.add(id));
-    if (seenIdsRef.current.size === 0) currentIds.forEach(id => seenIdsRef.current.add(id));
-    setReports(prev => normalized.map(r => {
-      const existing = prev.find(p => String(p.id) === String(r.id));
-      return existing ? { ...r, assigned_to: existing.assigned_to || r.assigned_to, assigned_charge: existing.assigned_charge || r.assigned_charge } : r;
-    }));
-    setLoading(realtimeLoading);
-  }, [realtimeReports, realtimeLoading]);
+    setLoading(false);
+    setNewCount(0);
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // ── POLLING (replaces unreliable realtime for Express inserts) ──
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const data = await fetchAllReports();
+      if (data.length > 0) {
+        const normalized = data.map(normalizeReport);
+        setReports(prev => {
+          const newIds = normalized.filter(r => !seenIdsRef.current.has(r.id));
+          if (newIds.length > 0) {
+            newIds.forEach(r => seenIdsRef.current.add(r.id));
+            setToastCount(newIds.length);
+            setShowToast(true);
+            setNewCount(c => c + newIds.length);
+          }
+          return normalized;
+        });
+      }
+    }, 30000);
+
+    const onFocus = () => refresh();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refresh]);
 
   // ── STATS GLOBALES ──
   const total = reports.length;
@@ -768,43 +832,66 @@ export default function ResponsableDashboard() {
 
   const selectedReport = useMemo(() => reports.find(r => String(r.id) === String(selectedId)) || null, [reports, selectedId]);
 
-  // ── VALIDATION HANDLERS ──
+  // ═══════════════════════════════════════════════════════════════
+  //  VALIDATION HANDLERS — CORRECTED (uses backend hook)
+  // ═══════════════════════════════════════════════════════════════
+
+  // ✅ FIX: Utiliser le hook backend au lieu de Supabase direct
   const handleValidate = async (reportId) => {
+    const report = reports.find(r => String(r.id) === String(reportId));
+    if (!report) {
+      console.error('Rapport non trouvé pour ID:', reportId);
+      return;
+    }
+
     try {
-      const report = reports.find(r => String(r.id) === String(reportId));
-      if (!report) throw new Error('Rapport non trouvé');
-      const stored = localStorage.getItem('user');
-      const user = stored ? JSON.parse(stored) : null;
-      // ✅ FIX: Cast reportId to Number for PostgREST compatibility
-      // ✅ FIX: Set status to 'validé' instead of 'clôturé'
-      const { error } = await supabase.from('reports').update({
-        status: 'validé',
-        cloture_at: new Date().toISOString(),
-        cloture_by: user?.id ? Number(user.id) : null,
-        cloture_name: user?.full_name || user?.name || null,
-      }).eq('id', Number(reportId));
-      if (!error) {
-        setReports(prev => prev.map(r => String(r.id) === String(reportId) ? { ...r, status: 'validé' } : r));
+      // ✅ Appel au backend Express via le hook validateFinal
+      // Ce hook appelle PATCH /api/reports/:id/decision-finale
+      const { success, error } = await validateFinal(reportId, {
+        decision: 'valide',
+        score: report.compliance_score,
+      });
+
+      if (success) {
+        // Mise à jour locale de l'UI
+        setReports(prev => prev.map(r =>
+          String(r.id) === String(reportId)
+            ? { ...r, status: 'validé', validated_at: new Date().toISOString() }
+            : r
+        ));
         setValidated(prev => ({ ...prev, [reportId]: true }));
-        if (report.assigned_charge) {
-          await supabase.from('notifications').insert({
-            user_id: Number(report.assigned_charge),
-            type: 'rapport_valide',
-            title: 'Rapport validé',
-            message: `Le rapport "${report.company_name}" a été validé par le responsable QA.`,
-            related_report_id: Number(reportId),
-            is_read: false,
-          });
-        }
+      } else {
+        console.error('Validation échouée:', error);
+        alert(`Erreur lors de la validation : ${error || 'Erreur inconnue'}`);
       }
-    } catch (err) { console.error('Erreur lors de la validation:', err); }
+    } catch (err) {
+      console.error('Erreur handleValidate:', err);
+      alert('Erreur serveur lors de la validation du rapport');
+    }
   };
 
+  // ✅ FIX: handleReject doit aussi utiliser le hook backend
   const handleReject = async (reportId, reason = '') => {
-    // ✅ FIX: Cast reportId to Number
-    const { success, error } = await rejectReport(Number(reportId), reason);
-    if (success) setReports(prev => prev.map(r => String(r.id) === String(reportId) ? { ...r, status: 'rejeté' } : r));
-    else console.error('Rejet échoué:', error);
+    try {
+      const { success, error } = await validateFinal(reportId, {
+        decision: 'rejete',
+        reason: reason.trim() || 'Aucun motif fourni',
+      });
+
+      if (success) {
+        setReports(prev => prev.map(r =>
+          String(r.id) === String(reportId)
+            ? { ...r, status: 'rejeté', rejected_at: new Date().toISOString() }
+            : r
+        ));
+      } else {
+        console.error('Rejet échoué:', error);
+        alert(`Erreur lors du rejet : ${error || 'Erreur inconnue'}`);
+      }
+    } catch (err) {
+      console.error('Erreur handleReject:', err);
+      alert('Erreur serveur lors du rejet du rapport');
+    }
   };
 
   // ── AFFECTATION HANDLERS ──
@@ -842,7 +929,6 @@ export default function ResponsableDashboard() {
     ));
     
     closeModal();
-    // ❌ REMOVED: setTimeout(refresh, 1200) ← il écrasait l'état local avec des données potentiellement obsolètes
   };
 
   // ── KPI HELPERS ──
@@ -893,7 +979,7 @@ export default function ResponsableDashboard() {
   //  ONGLET 1: RAPPORTS (Gestion + Affectation)
   // ═════════════════════════════════════════════════════════════════
   const TabRapports = () => {
-    const newIds = realtimeReports ? new Set(realtimeReports.slice(0, newCount).map(r => r.id)) : new Set();
+    const newIds = useMemo(() => new Set(reports.slice(0, newCount).map(r => r.id)), [reports, newCount]);
     return (
       <div style={{display:'flex',flexDirection:'column',gap:20}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:16,flexWrap:'wrap'}}>
@@ -969,8 +1055,6 @@ export default function ResponsableDashboard() {
   // ═════════════════════════════════════════════════════════════════
   const TabDecideur = () => <ResponsableDecideurView reports={reports} />;
 
-
-
   // ═════════════════════════════════════════════════════════════════
   //  ONGLET 4: KPIs (Définition des indicateurs de sécurité)
   // ═════════════════════════════════════════════════════════════════
@@ -1021,7 +1105,6 @@ export default function ResponsableDashboard() {
     { key:'rapports',     label:'Rapports',           icon:'≡', badge:total, badgeNew: unassignedCount > 0 },
     { key:'validation',   label:'Validation QA',      icon:'✓', badge:enAttenteCount },
     { key:'decideur',     label:'Vue Décideur',       icon:'📊' },
-    
     { key:'indicateurs',  label:'KPIs Sécurité',      icon:'∿', badge:kpis.length },
   ];
 
@@ -1097,7 +1180,6 @@ export default function ResponsableDashboard() {
         {section === 'rapports'     && <TabRapports />}
         {section === 'validation'   && <TabValidation />}
         {section === 'decideur'     && <TabDecideur />}
-        
         {section === 'indicateurs'  && <TabIndicateurs />}
       </div>
     </div>
