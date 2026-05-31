@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import API from '../../services/api';
 import TechnicalReviewInterface from '../../components/Module3_TechnicalReview/TechnicalReviewInterface';
 import { useMyAssignedReports } from '../../hooks/useMyAssignedReports';
-import { useReportsRealtime } from '../../hooks/useReportsRealtime';
 import { useAssignReport } from '../../hooks/useAssignReport';
 import supabase from '../../lib/supabaseClient';
 
@@ -526,8 +524,6 @@ export default function ChargeEtudeDashboard() {
   
   const navigate = useNavigate();
   
-  const fetchChargesEtudeCalledRef = useState(false);
-  
   const getPublicPdfUrl = useCallback((rep) => {
     if (!rep) return null;
     if (rep?.file_url?.startsWith('http')) return rep.file_url;
@@ -574,10 +570,8 @@ export default function ChargeEtudeDashboard() {
     refetch 
   } = useMyAssignedReports(user?.id, handleNewAssignment);
 
-  const { reports: realtimeReports, loading: realtimeLoading } = useReportsRealtime("assigné");
-
   // ✅ MODIFICATION: Added submitToResponsable to the destructuring
-  const { assignReport, fetchChargesEtude, chargesEtude, submitToResponsable } = useAssignReport();
+  const { submitToResponsable } = useAssignReport();
 
   useEffect(() => {
     try {
@@ -611,11 +605,6 @@ export default function ChargeEtudeDashboard() {
       }
   
       setUser(u);
-  
-      if (!fetchChargesEtudeCalledRef.current) {
-        fetchChargesEtudeCalledRef.current = true;
-        fetchChargesEtude();
-      }
     } catch (err) {
       console.error('Dashboard init error:', err);
       localStorage.removeItem('user');
@@ -672,7 +661,7 @@ export default function ChargeEtudeDashboard() {
         .from('reports')
         .update({ status: 'in_progress' })
         .eq('id', reportId)
-        .eq('assigned_to', user?.id);
+        .eq('assigned_charge', user?.id);
   
       if (error) throw new Error(error.message);
   
@@ -697,21 +686,46 @@ export default function ChargeEtudeDashboard() {
     setSelectedReport(report);
     setLoadingReport(true);
     try {
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('id', report.id)
-        .single();
+      const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       
-      if (!error && data) {
-        setFullReport(data);
+      const res = await fetch(`${API_BASE}/reports/${report.id}/full`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      
+      if (res.ok) {
+        const fullData = await res.json();
+        // Merge the annexes into extracted_data so TechnicalReviewInterface can read it
+        const mergedReport = {
+          ...fullData.report,
+          extracted_data: fullData.annexes
+        };
+        setFullReport(mergedReport);
       } else {
-        console.warn('Erreur fetch rapport:', error);
-        setFullReport(report);
+        console.warn('API /full échoué, fallback sur supabase reports:', res.status);
+        const { data, error } = await supabase
+          .from('reports')
+          .select('*')
+          .eq('id', report.id)
+          .single();
+        
+        if (!error && data) {
+          setFullReport(data);
+        } else {
+          setFullReport(report);
+        }
       }
     } catch (err) {
       console.error('Exception lors du fetch:', err);
-      setFullReport(report);
+      try {
+        const { data } = await supabase.from('reports').select('*').eq('id', report.id).single();
+        setFullReport(data || report);
+      } catch (fallbackErr) {
+        setFullReport(report);
+      }
     } finally {
       setLoadingReport(false);
     }
@@ -719,10 +733,10 @@ export default function ChargeEtudeDashboard() {
 
   const filteredReports = assignedReports?.filter(report => {
     if (filterStatus === 'all') return true;
-    if (filterStatus === 'pending') return report.status === 'pending' || !report.status;
-    if (filterStatus === 'in_progress') return report.status === 'in_progress';
-    if (filterStatus === 'verified') return report.status === 'verified';
-    if (filterStatus === 'rejected') return report.status === 'rejected';
+    if (filterStatus === 'déposé') return report.status === 'déposé';
+    if (filterStatus === 'assigné') return report.status === 'assigné';
+    if (filterStatus === 'validé') return report.status === 'validé' || report.status === 'en_validation';
+    if (filterStatus === 'clôturé') return report.status === 'clôturé';
     return true;
   }) || [];
 
@@ -730,7 +744,7 @@ export default function ChargeEtudeDashboard() {
     total:      assignedReports?.length || 0,
     pending:    assignedReports?.filter(r => r.status === 'déposé').length   || 0,
     inProgress: assignedReports?.filter(r => r.status === 'assigné').length  || 0,
-    verified:   assignedReports?.filter(r => r.status === 'validé').length   || 0,
+    verified:   assignedReports?.filter(r => r.status === 'validé' || r.status === 'en_validation').length   || 0,
     rejected:   assignedReports?.filter(r => r.status === 'clôturé').length  || 0,
   };
 
@@ -902,11 +916,13 @@ export default function ChargeEtudeDashboard() {
                     
                     <span className={`ce-assignment-status ${
                       report.status === 'validé'  ? 'ce-status-verified'    :
+                      report.status === 'en_validation' ? 'ce-status-pending' :
                       report.status === 'clôturé' ? 'ce-status-rejected'    :
                       report.status === 'assigné' ? 'ce-status-in-progress' :
                       'ce-status-pending'
                     }`}>
                       {report.status === 'validé'  ? '✓ Validé'    :
+                      report.status === 'en_validation' ? '⏳ En attente validation' :
                       report.status === 'clôturé' ? '✕ Clôturé'   :
                       report.status === 'assigné' ? '⚙ En cours'  :
                       '⏳ Déposé'}
@@ -940,7 +956,7 @@ export default function ChargeEtudeDashboard() {
                   </div>
                   
                   <div className="ce-assignment-actions">
-                    {report.status !== 'validé' && report.status !== 'clôturé' && report.status !== 'assigné' && (
+                    {report.status === 'déposé' && (
                       <button 
                         className="ce-start-analysis-btn"
                         onClick={(e) => {
@@ -959,20 +975,12 @@ export default function ChargeEtudeDashboard() {
                         e.stopPropagation();
                         handleValidateReport(report.id);
                       }}
-                      disabled={report.status === 'validé' || report.status === 'clôturé'}
+                      disabled={report.status === 'en_validation' || report.status === 'validé' || report.status === 'clôturé'}
                     >
-                      {report.status === 'validé' ? '✓ Déjà validé' : '✓ Valider le rapport'}
-                    </button>
-                    
-                    <button 
-                      className="ce-reject-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRejectReport(report.id);
-                      }}
-                      disabled={report.status === 'validé' || report.status === 'clôturé'}
-                    >
-                      {report.status === 'clôturé' ? '✕ Clôturé' : '✕ Rejeter'}
+                      {report.status === 'en_validation' ? '⏳ En attente validation' 
+                       : report.status === 'validé' ? '✓ Validé' 
+                       : report.status === 'clôturé' ? '✓ Clôturé' 
+                       : '✓ Valider et soumettre'}
                     </button>
                   </div>
                 </div>
@@ -1011,7 +1019,6 @@ export default function ChargeEtudeDashboard() {
                   }
                   return result;
                 }}
-                onReject={handleRejectReport}
               />
             )}
           </div>

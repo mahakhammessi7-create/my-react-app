@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAssignReport } from "../../hooks/useAssignReport";
 import supabase from '../../lib/supabaseClient';
-import { ResponsableOperationnelView, ResponsableDecideurView } from './ResponsableComplexDashboard';
+
 import { useSharedDashboard } from "../../hooks/useSharedDashboard";
+import { getAuthToken } from '../../lib/auth';
 
 /* ═══════════════════════════════════════════════════════════════════
    GÉNÉRATEUR D'ANNOTATIONS CONTEXTUELLES (Auto-QA)
-   → Garantit la fiabilité des données avant affichage
 ═══════════════════════════════════════════════════════════════════ */
 function generateAutoAnnotations(report) {
   if (!report) return [];
@@ -214,19 +214,23 @@ function useReportAnnotations(reportId, report) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!reportId) return;
+    if (!reportId) { setRealAnnotations([]); return; }
     setLoading(true);
+
     supabase
       .from('report_annotations')
       .select('*')
       .eq('report_id', reportId)
-      .eq('status', 'sent')
       .order('created_at', { ascending: false })
-      .then(({ data, error }) => { 
-        if (!error) setRealAnnotations(data || []); 
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[useReportAnnotations] Supabase error:', error.message);
+        } else {
+          const sent = (data || []).filter(a => !a.status || a.status === 'sent');
+          setRealAnnotations(sent.length > 0 ? sent : (data || []));
+        }
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      });
   }, [reportId]);
 
   const hasRealAnnotations = realAnnotations.length > 0;
@@ -491,11 +495,8 @@ const CSS = `
 `;
 
 /* ═══════════════════════════════════════════════════════════════════
-   CONSTANTS
+   CONSTANTS & HELPERS
 ═══════════════════════════════════════════════════════════════════ */
-const PRIORITIES = ['Normale', 'Moyenne', 'Haute'];
-const KPI_TYPES  = ['Taux (%)', 'Ratio', 'Nombre', 'Score pondéré'];
-
 const VALIDATION_CRITERIA = [
   { id:'integrite',  label:'Intégrité des données',          desc:'Les données sources sont complètes et sans anomalie.',      severity:'critique' },
   { id:'biais',      label:'Absence de biais méthodologique', desc:'La méthodologie est libre de biais identifiables.',         severity:'critique' },
@@ -506,27 +507,23 @@ const VALIDATION_CRITERIA = [
   { id:'qualite',    label:'Qualité des recommandations',     desc:'Les recommandations sont actionnables et fondées.',         severity:'mineur'   },
 ];
 
-/* ═══════════════════════════════════════════════════════════════════
-   HELPERS
-═══════════════════════════════════════════════════════════════════ */
 const isResponsable = r => { const s = String(r||'').toLowerCase(); return s.includes('responsable')||s.includes('suivi')||s.includes('resp_suivi'); };
 const formatDate    = d => d ? new Date(d).toLocaleDateString('fr-FR') : '—';
 const now           = () => new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-
 const initials = name => {
   if (!name) return '??';
   const str = String(name);
   if (/^\d+$/.test(str)) return '??';
   return str.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 };
-
-const scoreColor    = s => s >= 75 ? 'rd-score-green' : s >= 55 ? 'rd-score-amber' : 'rd-score-red';
+const scoreColor = s => s >= 75 ? 'rd-score-green' : s >= 55 ? 'rd-score-amber' : 'rd-score-red';
 
 const STATUS_MAP = {
   'déposé': 'déposé', 'depose': 'déposé',
   'assigné': 'assigné', 'assigne': 'assigné', 'assigned': 'assigné', 'affecte': 'assigné',
   'en_validation': 'en_validation', 'en validation': 'en_validation', 'envalidation': 'en_validation',
-  'validé': 'validé', 'valide': 'validé', 'validated': 'validé',
+  'valide_tech': 'en_validation', 'validé_tech': 'en_validation',
+  'validé': 'validé', 'valide': 'validé', 'validated': 'validé', 'valide_final': 'validé', 'validé_final': 'validé',
   'clôturé': 'clôturé', 'cloturé': 'clôturé', 'cloture': 'clôturé',
   'rejeté': 'rejeté', 'rejete': 'rejeté', 'rejected': 'rejeté',
 };
@@ -553,7 +550,6 @@ const CheckIcon = () => (
     <polyline points="2,6 5,9 10,3"/>
   </svg>
 );
-
 
 function StatusBadge({ status }) {
   const map = {
@@ -676,11 +672,6 @@ function NewReportToast({ count, onDismiss, onView }) {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   FETCH PAGINÉ (contourne la limite 1000 lignes de Supabase)
-   → Pagination par ID pour éviter les doublons/omissions
-   → Tri final par upload_date pour l'affichage
-═══════════════════════════════════════════════════════════════════ */
 const fetchAllReports = async () => {
   const PAGE_SIZE = 1000;
   let page = 0;
@@ -694,7 +685,7 @@ const fetchAllReports = async () => {
     const { data, error } = await supabase
       .from('reports')
       .select('*')
-      .order('id', { ascending: true })  // ← use id for stable pagination
+      .order('id', { ascending: true })
       .range(from, to);
 
     if (error) { console.error('Fetch error:', error); break; }
@@ -708,21 +699,18 @@ const fetchAllReports = async () => {
     }
   }
 
-  // Sort by upload_date descending after collecting all pages for display
   return allData.sort((a, b) => 
     new Date(b.upload_date || b.created_at) - new Date(a.upload_date || a.created_at)
   );
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   COMPOSANT PRINCIPAL - RESPONSABLE DASHBOARD
-   Architecture: 4 onglets fonctionnels
+   COMPOSANT PRINCIPAL
 ═══════════════════════════════════════════════════════════════════ */
 export default function ResponsableDashboard() {
   const navigate = useNavigate();
 
   const { assignReport, rejectReport, validateFinal, fetchChargesEtude, chargesEtude, assigning } = useAssignReport();
-   
   const { published, publishKpi, unpublish } = useSharedDashboard();
 
   const [reports, setReports] = useState([]);
@@ -739,18 +727,16 @@ export default function ResponsableDashboard() {
   const [validated, setValidated] = useState({});
   const [validationChecks, setValidationChecks] = useState({});
   const seenIdsRef = useRef(new Set());
-
-  // NEW: local newCount state
   const [newCount, setNewCount] = useState(0);
+  const [fullData, setFullData] = useState(null);
+  const prevSelectedIdRef = useRef(null);
 
+  // KPIs state (simplified - no form, no weights)
   const [kpis, setKpis] = useState([
     { id: 1, name: 'Taux de validation', formula: '(validés / total) × 100', type: 'Taux (%)' },
     { id: 2, name: "Taux d'affectation", formula: '(affectés / total) × 100', type: 'Taux (%)' },
   ]);
-  const [kpiForm, setKpiForm] = useState({ name: '', formula: '', type: KPI_TYPES[0] });
-  const [formulaTokens, setFormulaTokens] = useState([]);
   const [publishStatus, setPublishStatus] = useState({});
-  const [weightItems, setWeightItems] = useState(VALIDATION_CRITERIA.map(c => ({ id: c.id, label: c.label, weight: 20 })));
 
   // ── AUTH ──
   useEffect(() => {
@@ -763,7 +749,7 @@ export default function ResponsableDashboard() {
     fetchChargesEtude();
   }, [navigate, fetchChargesEtude]);
 
-  // ── FETCH ALL REPORTS (paginated) ──
+  // ── FETCH ALL REPORTS ──
   const refresh = useCallback(async () => {
     setLoading(true);
     const data = await fetchAllReports();
@@ -778,7 +764,28 @@ export default function ResponsableDashboard() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // ── POLLING (replaces unreliable realtime for Express inserts) ──
+  // ── FETCH FULL ANNEX DATA ──
+  useEffect(() => {
+    if (!selectedId) {
+      setFullData(null);
+      prevSelectedIdRef.current = null;
+      return;
+    }
+    if (prevSelectedIdRef.current === selectedId) return;
+    prevSelectedIdRef.current = selectedId;
+
+    const token = getAuthToken();
+    if (!token) return;
+    
+    fetch(`http://localhost:5000/api/reports/${selectedId}/full`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+    })
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then(d => { if (d.annexes) setFullData(d.annexes); })
+      .catch(() => { /* silent fallback */ });
+  }, [selectedId]);
+
+  // ── POLLING ──
   useEffect(() => {
     const interval = setInterval(async () => {
       const data = await fetchAllReports();
@@ -806,7 +813,7 @@ export default function ResponsableDashboard() {
     };
   }, [refresh]);
 
-  // ── STATS GLOBALES ──
+  // ── STATS ──
   const total = reports.length;
   const STATUTS_TRAITES = new Set(['assigné', 'en_validation', 'validé', 'clôturé', 'rejeté']);
   const assignedCount = reports.filter(r => r.assigned_charge || r.assigned_to || STATUTS_TRAITES.has(r.status)).length;
@@ -817,7 +824,6 @@ export default function ResponsableDashboard() {
   const pendingCount = total - validatedCount;
   const validationRate = total ? Math.round(validatedCount / total * 100) : 0;
   const assignRate = total ? Math.round(assignedCount / total * 100) : 0;
-
   const enAttenteCount = useMemo(() => 
     reports.filter(r => ['en_validation', 'validé', 'clôturé'].includes(r.status)).length
   , [reports]);
@@ -832,28 +838,13 @@ export default function ResponsableDashboard() {
 
   const selectedReport = useMemo(() => reports.find(r => String(r.id) === String(selectedId)) || null, [reports, selectedId]);
 
-  // ═══════════════════════════════════════════════════════════════
-  //  VALIDATION HANDLERS — CORRECTED (uses backend hook)
-  // ═══════════════════════════════════════════════════════════════
-
-  // ✅ FIX: Utiliser le hook backend au lieu de Supabase direct
+  // ── HANDLERS ──
   const handleValidate = async (reportId) => {
     const report = reports.find(r => String(r.id) === String(reportId));
-    if (!report) {
-      console.error('Rapport non trouvé pour ID:', reportId);
-      return;
-    }
-
+    if (!report) return;
     try {
-      // ✅ Appel au backend Express via le hook validateFinal
-      // Ce hook appelle PATCH /api/reports/:id/decision-finale
-      const { success, error } = await validateFinal(reportId, {
-        decision: 'valide',
-        score: report.compliance_score,
-      });
-
+      const { success, error } = await validateFinal(reportId, report.compliance_score);
       if (success) {
-        // Mise à jour locale de l'UI
         setReports(prev => prev.map(r =>
           String(r.id) === String(reportId)
             ? { ...r, status: 'validé', validated_at: new Date().toISOString() }
@@ -861,7 +852,6 @@ export default function ResponsableDashboard() {
         ));
         setValidated(prev => ({ ...prev, [reportId]: true }));
       } else {
-        console.error('Validation échouée:', error);
         alert(`Erreur lors de la validation : ${error || 'Erreur inconnue'}`);
       }
     } catch (err) {
@@ -870,14 +860,9 @@ export default function ResponsableDashboard() {
     }
   };
 
-  // ✅ FIX: handleReject doit aussi utiliser le hook backend
   const handleReject = async (reportId, reason = '') => {
     try {
-      const { success, error } = await validateFinal(reportId, {
-        decision: 'rejete',
-        reason: reason.trim() || 'Aucun motif fourni',
-      });
-
+      const { success, error } = await rejectReport(reportId, reason.trim() || 'Aucun motif fourni');
       if (success) {
         setReports(prev => prev.map(r =>
           String(r.id) === String(reportId)
@@ -885,7 +870,6 @@ export default function ResponsableDashboard() {
             : r
         ));
       } else {
-        console.error('Rejet échoué:', error);
         alert(`Erreur lors du rejet : ${error || 'Erreur inconnue'}`);
       }
     } catch (err) {
@@ -894,44 +878,27 @@ export default function ResponsableDashboard() {
     }
   };
 
-  // ── AFFECTATION HANDLERS ──
   const openModal = (rapport) => { setModalRapport(rapport); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setModalRapport(null); };
   
-  // ✅ FIX PRINCIPAL: handleConfirmAffectation avec casting explicite des IDs
   const handleConfirmAffectation = async (rapportId, chargeId) => {
-    // Trouver le chargé en comparant les IDs en string (tolérant aux types)
     const charge = chargesEtude.find(c => String(c.id) === String(chargeId));
-    if (!charge) {
-      console.error('Chargé non trouvé pour ID:', chargeId);
-      return;
-    }
-
+    if (!charge) return;
     try {
-      // ✅ CAST EXPLICITE : PostgREST exige des nombres pour les colonnes integer
-      const result = await assignReport(Number(rapportId), Number(chargeId));
-      console.log('assignReport result:', result);
+      await assignReport(Number(rapportId), Number(chargeId));
     } catch (e) {
       console.error('Assign failed:', e);
-      return; // ← stop ici si ça plante, ne pas mettre à jour l'UI
+      return;
     }
-
-    // Mise à jour locale de l'UI (comparaison tolérante pour l'affichage)
     setReports(prev => prev.map(r => 
       String(r.id) === String(rapportId)
-        ? { 
-            ...r, 
-            assigned_to: charge.full_name, 
-            assigned_charge: chargeId, 
-            status: r.status === 'déposé' ? 'assigné' : r.status 
-          }
+        ? { ...r, assigned_to: charge.full_name, assigned_charge: chargeId, status: r.status === 'déposé' ? 'assigné' : r.status }
         : r
     ));
-    
     closeModal();
   };
 
-  // ── KPI HELPERS ──
+  // ── KPI HELPERS (simplified) ──
   const evalKpi = (f) => {
     try {
       if (!f || typeof f !== 'string') return 0;
@@ -945,27 +912,6 @@ export default function ResponsableDashboard() {
     } catch { return 0; }
   };
 
-  const addKpi = () => {
-    if (!kpiForm.name.trim() || !kpiForm.formula.trim()) return;
-    setKpis(prev => [...prev, { id: Date.now(), ...kpiForm }]);
-    setKpiForm({ name: '', formula: '', type: KPI_TYPES[0] });
-    setFormulaTokens([]);
-  };
-
-  const appendToken = tok => { setFormulaTokens(prev => [...prev, tok]); setKpiForm(p => ({ ...p, formula: [...formulaTokens, tok].join(' ') })); };
-
-  const weightedScore = useMemo(() => {
-    const totalW = weightItems.reduce((s, w) => s + Number(w.weight), 0);
-    if (!totalW || !total) return 0;
-    const completedW = VALIDATION_CRITERIA.reduce((s, c) => {
-      const w = weightItems.find(x => x.id === c.id);
-      const done = Object.values(validationChecks).filter(v => v[c.id]).length;
-      return s + (done / total) * Number(w?.weight || 0);
-    }, 0);
-    return Math.round((completedW / totalW) * 100);
-  }, [weightItems, validationChecks, total]);
-
-  // ── PUBLISH KPI ──
   const publishKpiToDecideur = async (kpi) => {
     setPublishStatus(prev => ({ ...prev, [kpi.id]: 'publishing' }));
     const result = await publishKpi({ ...kpi, value: evalKpi(kpi.formula) });
@@ -975,9 +921,9 @@ export default function ResponsableDashboard() {
 
   const handleLogout = () => { localStorage.clear(); navigate('/responsable-login'); };
 
-  // ═════════════════════════════════════════════════════════════════
-  //  ONGLET 1: RAPPORTS (Gestion + Affectation)
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
+  //  TAB: RAPPORTS
+  // ═══════════════════════════════════════════════════════════════
   const TabRapports = () => {
     const newIds = useMemo(() => new Set(reports.slice(0, newCount).map(r => r.id)), [reports, newCount]);
     return (
@@ -1008,16 +954,16 @@ export default function ResponsableDashboard() {
           </div>
           <div className="rd-panel">
             <div className="rd-panel-hd"><h2>Détail & Affectation</h2></div>
-            <div className="rd-panel-bd">{!selectedReport ? (<div className="rd-empty">Sélectionnez un rapport pour voir ses détails et l'affecter.</div>) : (<><div className="rd-detail-section"><h3>Informations du rapport</h3>{[['Organisme', selectedReport.company_name],['Secteur', selectedReport.sector],['Dépôt', formatDate(selectedReport.upload_date)]].map(([k,v]) => (<div key={k} className="rd-detail-row"><span className="rd-detail-key">{k}</span><span className="rd-detail-val">{v}</span></div>))}<div className="rd-detail-row"><span className="rd-detail-key">Score conformité</span><span className={scoreColor(selectedReport.compliance_score)} style={{fontSize:16}}>{selectedReport.compliance_score}%</span></div><div className="rd-detail-row"><span className="rd-detail-key">Statut</span><StatusBadge status={selectedReport.status}/></div>{selectedReport.maturity_level && (<div className="rd-detail-row"><span className="rd-detail-key">Niveau maturité</span><span className="rd-detail-val">Niveau {selectedReport.maturity_level}</span></div>)}</div><div className="rd-detail-section"><h3>Affectation</h3><p style={{fontSize:12,color:'var(--txt3)',marginBottom:10}}>Assignez ce rapport à un chargé d'étude pour traitement.</p><BoutonAffecter rapport={selectedReport} chargesEtude={chargesEtude} onAffecter={openModal} loading={assigning}/>{selectedReport.assigned_to && (<div style={{marginTop:10,padding:'9px 12px',background:'rgba(16,185,129,.07)',border:'1px solid rgba(16,185,129,.15)',borderRadius:9,fontSize:12,color:'var(--g)'}}>✓ Assigné à <strong>{selectedReport.assigned_to}</strong>{selectedReport.assigned_at && (<span style={{color:'var(--txt3)',marginLeft:8}}>le {formatDate(selectedReport.assigned_at)}</span>)}</div>)}</div><div className="rd-detail-section"><h3>Priorité & délai</h3><div className="rd-field"><label className="rd-label">Priorité</label><select className="rd-select" defaultValue={selectedReport.priority}>{PRIORITIES.map(p=><option key={p}>{p}</option>)}</select></div><div className="rd-field" style={{marginBottom:0}}><label className="rd-label">Date limite</label><input type="date" className="rd-input" defaultValue={selectedReport.deadline||''}/></div></div></>)}</div>
+            <div className="rd-panel-bd">{!selectedReport ? (<div className="rd-empty">Sélectionnez un rapport pour voir ses détails et l'affecter.</div>) : (<><div className="rd-detail-section"><h3>Informations du rapport</h3>{[['Organisme', selectedReport.company_name],['Secteur', selectedReport.sector],['Dépôt', formatDate(selectedReport.upload_date)]].map(([k,v]) => (<div key={k} className="rd-detail-row"><span className="rd-detail-key">{k}</span><span className="rd-detail-val">{v}</span></div>))}<div className="rd-detail-row"><span className="rd-detail-key">Score conformité</span><span className={scoreColor(selectedReport.compliance_score)} style={{fontSize:16}}>{selectedReport.compliance_score}%</span></div><div className="rd-detail-row"><span className="rd-detail-key">Statut</span><StatusBadge status={selectedReport.status}/></div>{selectedReport.maturity_level && (<div className="rd-detail-row"><span className="rd-detail-key">Niveau maturité</span><span className="rd-detail-val">Niveau {selectedReport.maturity_level}</span></div>)}</div><div className="rd-detail-section"><h3>Affectation</h3><p style={{fontSize:12,color:'var(--txt3)',marginBottom:10}}>Assignez ce rapport à un chargé d'étude pour traitement.</p><BoutonAffecter rapport={selectedReport} chargesEtude={chargesEtude} onAffecter={openModal} loading={assigning}/>{selectedReport.assigned_to && (<div style={{marginTop:10,padding:'9px 12px',background:'rgba(16,185,129,.07)',border:'1px solid rgba(16,185,129,.15)',borderRadius:9,fontSize:12,color:'var(--g)'}}>✓ Assigné à <strong>{selectedReport.assigned_to}</strong>{selectedReport.assigned_at && (<span style={{color:'var(--txt3)',marginLeft:8}}>le {formatDate(selectedReport.assigned_at)}</span>)}</div>)}</div><div className="rd-detail-section"><h3>Priorité & délai</h3><div className="rd-field"><label className="rd-label">Priorité</label><select className="rd-select" defaultValue={selectedReport.priority}><option>Normale</option><option>Moyenne</option><option>Haute</option></select></div><div className="rd-field" style={{marginBottom:0}}><label className="rd-label">Date limite</label><input type="date" className="rd-input" defaultValue={selectedReport.deadline||''}/></div></div></>)}</div>
           </div>
         </div>
       </div>
     );
   };
 
-  // ═════════════════════════════════════════════════════════════════
-  //  ONGLET 2: VALIDATION QA (Garantie de fiabilité)
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
+  //  TAB: VALIDATION QA
+  // ═══════════════════════════════════════════════════════════════
   const TabValidation = () => {
     const enAttente = reports.filter(r => ['en_validation', 'validé', 'clôturé'].includes(r.status));
     const { annotations, loading: annLoading, isAuto, hasRealAnnotations } = useReportAnnotations(selectedId, selectedReport);
@@ -1036,81 +982,387 @@ export default function ResponsableDashboard() {
     const effectiveChecks = (rId) => ({ ...autoChecks, ...(validationChecks[rId] || {}) });
     const critChecksOk = (rId) => VALIDATION_CRITERIA.filter(c => c.severity === 'critique').every(c => effectiveChecks(rId)[c.id]);
     const checksDone = (rId) => VALIDATION_CRITERIA.filter(c => effectiveChecks(rId)[c.id]).length;
-    const toggleCheckResp = (rId, cId) => { if (validated[rId]) return; setValidationChecks(prev => ({ ...prev, [rId]: { ...prev[rId], [cId]: !effectiveChecks(rId)[cId] } })); };
+const toggleCheckResp = (rId, cId) => { 
+  if (validated[rId]) return; 
+  setValidationChecks(prev => ({ 
+    ...prev, 
+    [rId]: { ...prev[rId], [cId]: !effectiveChecks(rId)[cId] } 
+  })); 
+};
     const annColors = { remarque: '#a78bfa', reserve: '#fbbf24', recommandation: '#34d399' };
     const annBg = { remarque: 'rgba(139,92,246,.08)', reserve: 'rgba(245,158,11,.08)', recommandation: 'rgba(16,185,129,.08)' };
     const annBorder = { remarque: '#7c3aed', reserve: '#d97706', recommandation: '#059669' };
     const sel = selectedReport;
     const sevStyle = (s) => ({ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99, letterSpacing: '.04em', background: s === 'critique' ? 'rgba(239,68,68,.15)' : s === 'majeur' ? 'rgba(245,158,11,.12)' : 'rgba(100,116,139,.12)', color: s === 'critique' ? '#f87171' : s === 'majeur' ? '#fbbf24' : '#94a3b8' });
+
+    const a7g = fullData?.annexe7?.global || {};
+    const a7d = Array.isArray(fullData?.annexe7?.detail) ? fullData.annexe7.detail : [];
+    const a6g = fullData?.annexe6?.global || {};
+    const a6c = Array.isArray(fullData?.annexe6?.criteres) ? fullData.annexe6.criteres : [];
+    const a8r = Array.isArray(fullData?.annexe8) ? fullData.annexe8 : [];
+    const a3r = fullData?.annexe3 || {};
+
+    const dataSource = fullData ? 'Annexe 7' : null;
+
+    const findInDetail = (...keywords) => {
+      for (const kw of keywords) {
+        const kl = kw.toLowerCase();
+        const found = a7d.find(r => {
+          const ind = (r.indicateur || r.nom || '').toLowerCase();
+          const cat = (r.categorie || '').toLowerCase();
+          return ind.includes(kl) || cat.includes(kl);
+        });
+        if (found) {
+          const v = found.valeur ?? found.value ?? found.statut;
+          if (v !== undefined && v !== null && v !== '') return v;
+        }
+      }
+      return undefined;
+    };
+
+    const findInA6 = (...keywords) => {
+      for (const kw of keywords) {
+        const kl = kw.toLowerCase();
+        const found = a6c.find(r => {
+          const cr = (r.critere || r.domaine || r.nom || '').toLowerCase();
+          return cr.includes(kl);
+        });
+        if (found) return found.score;
+      }
+      return undefined;
+    };
+
+    const toBoolVal = (v) => {
+      if (v === true  || v === 1 || v === 'oui' || v === 'yes' || v === '✅' || v === 'Oui') return true;
+      if (v === false || v === 0 || v === 'non' || v === 'no'  || v === '❌' || v === 'Non') return false;
+      if (typeof v === 'string') {
+        const vl = v.toLowerCase();
+        if (vl === 'oui' || vl === 'yes' || vl === 'présent' || vl === 'ok' || vl === 'true') return true;
+        if (vl === 'non' || vl === 'no'  || vl === 'absent'  || vl === 'false') return false;
+      }
+      return undefined;
+    };
+
+    const boolFrom = (primary, ...fallbackKeys) => {
+      if (primary !== undefined && primary !== null) return toBoolVal(primary);
+      const v = findInDetail(...fallbackKeys);
+      return toBoolVal(v) ?? null;
+    };
+
+    const indRssi = sel ? (() => {
+      const score = findInA6('fonctions et responsabilités', '5.2', 'rssi');
+      if (score != null) return score >= 2;
+      return boolFrom(a7g.rssi_nomme ?? a7g.has_rssi, 'rssi', 'responsable sécurité');
+    })() : null;
+
+    const indPssi = sel ? (() => {
+      const score = findInA6('politiques de sécurité', '5.1', 'pssi');
+      if (score != null) return score >= 2;
+      return boolFrom(a7g.pssi_existe ?? a7g.has_pssi, 'pssi', 'politique sécurité');
+    })() : null;
+
+    const indPca = sel ? (() => {
+      const v = findInDetail('continuité d\'activité', 'pca', 'plan de continuité');
+      if (v !== undefined) return toBoolVal(v) ?? (Number(v) > 0 ? true : (Number(v) === 0 ? false : null));
+      return boolFrom(a7g.pca_existe ?? a7g.has_pca, 'pca');
+    })() : null;
+
+    const indSiem = sel ? (() => {
+      const v = findInDetail('solution siem', 'siem');
+      if (v !== undefined && v !== null) return Number(v) > 0 ? true : false;
+      const raw = a7g.siem_existe ?? a7g.has_siem;
+      return raw != null ? toBoolVal(raw) : null;
+    })() : null;
+
+    const indPra = sel ? toBoolVal(a7g.pra_existe ?? a7g.has_pra) ?? null : null;
+    const indComite = sel ? toBoolVal(a7g.comite_ssi ?? a7g.has_comite) ?? null : null;
+
+    const srvCount = sel ? (
+      Array.isArray(a3r.serveurs)
+        ? a3r.serveurs.filter(s => s && (s.nom || s.name || s.id || s.hostname || Object.keys(s).length > 0)).length
+        : sel.total_servers ?? null
+    ) : null;
+
+    const vulnCrit = sel ? (
+      a8r.length > 0
+        ? a8r.filter(v => {
+            const c = (v.criticite || v.impact || v.probabilite || v.vulnerabilite || '').toLowerCase();
+            return c.includes('crit') || c.includes('élevé') || c.includes('high') || c.includes('très');
+          }).length
+        : sel.critical_vulns_open ?? null
+    ) : null;
+
+    const INDICATORS = [
+      { label: 'RSSI nommé', val: indRssi, bool: true, source: dataSource, annexe: "Annexe 7 – Responsable Sécurité SI" },
+      { label: 'PSSI', val: indPssi, bool: true, source: dataSource, annexe: "Annexe 7 – Politique de Sécurité SI" },
+      { label: 'PCA', val: indPca, bool: true, source: dataSource, annexe: "Annexe 7 – Plan de Continuité d'Activité" },
+      { label: 'PRA', val: indPra, bool: true, source: dataSource, annexe: "Annexe 7 – Plan de Reprise d'Activité" },
+      { label: 'Comité SSI', val: indComite, bool: true, source: dataSource, annexe: "Annexe 7 – Comité Sécurité SI" },
+      { label: 'Solution SIEM', val: indSiem, bool: true, source: dataSource, annexe: "Annexe 7 – Supervision des journaux" },
+      { label: 'Vulns critiques', val: vulnCrit != null ? String(vulnCrit) : (sel?.critical_vulns_open != null ? String(sel.critical_vulns_open) : '—'), bool: false, source: fullData && a8r.length > 0 ? 'Annexe 8' : (sel?.critical_vulns_open != null ? 'rapport' : null), annexe: "Annexe 8 – Vulnérabilités très critiques" },
+      { label: 'Nb serveurs', val: srvCount != null ? String(srvCount) : (sel?.total_servers != null ? String(sel.total_servers) : '—'), bool: false, source: fullData && Array.isArray(a3r.serveurs) ? 'Annexe 3' : (sel?.total_servers != null ? 'rapport' : null), annexe: "Annexe 3 – Description du SI" },
+    ];
+
     return (
       <div style={{ display: 'flex', gap: 20 }}>
-        <div style={{ width: 340, flexShrink: 0 }}><div className="rd-panel" style={{ overflow: 'hidden' }}><div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ fontSize: 13, fontWeight: 700, color: '#dff8ee' }}>Validation finale</span><span style={{ fontSize: 11, background: 'rgba(16,185,129,.12)', color: '#34d399', padding: '2px 9px', borderRadius: 99, fontWeight: 700 }}>{enAttente.length}</span></div><p style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 4 }}>Rapports soumis par les chargés d'étude</p></div>{enAttente.length === 0 ? (<div style={{ padding: '40px 20px', textAlign: 'center' }}><div style={{ fontSize: 32, marginBottom: 8 }}>✅</div><div style={{ fontSize: 13, color: 'var(--txt3)' }}>Aucun rapport en attente</div></div>) : (<div style={{ maxHeight: 600, overflowY: 'auto' }}>{enAttente.map(r => { const done = checksDone(r.id); const isSelected = String(selectedId) === String(r.id); const pct = Math.round(done / VALIDATION_CRITERIA.length * 100); const isValide = validated[r.id] || r.status === 'validé'; const isCloture = r.status === 'clôturé'; const isRejete = r.status === 'rejeté'; return (<div key={r.id} onClick={() => setSelectedId(r.id)} style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,.04)', cursor: 'pointer', background: isSelected ? 'rgba(16,185,129,.06)' : 'transparent', borderLeft: isSelected ? '3px solid #10b981' : '3px solid transparent', transition: 'all .15s' }}><div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}><div style={{ minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#e8fff6', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.company_name}</div><div style={{ fontSize: 10, color: 'var(--txt3)' }}>#RPT-{String(r.id).padStart(4, '0')} · {r.sector}</div></div>{isCloture ? (<span style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 700, whiteSpace: 'nowrap' }}>✓ Clôturé</span>) : isValide ? (<span style={{ fontSize: 10, color: '#34d399', fontWeight: 700, whiteSpace: 'nowrap' }}>✓ Validé</span>) : isRejete ? (<span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }}>✕ Rejeté</span>) : (<StatusBadge status={r.status} />)}</div><div style={{ marginTop: 10 }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><span style={{ fontSize: 10, color: 'var(--txt3)' }}>Checklist</span><span style={{ fontSize: 10, color: done === 7 ? '#34d399' : 'var(--txt3)', fontWeight: 600 }}>{done}/{VALIDATION_CRITERIA.length}</span></div><div style={{ height: 3, background: 'rgba(255,255,255,.08)', borderRadius: 99 }}><div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: pct === 100 ? '#10b981' : pct >= 57 ? '#3b82f6' : '#f59e0b', transition: 'width .3s' }} /></div></div>{r.assigned_to && (<div style={{ marginTop: 8, fontSize: 10, color: 'var(--txt3)', display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(16,185,129,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: '#34d399' }}>{initials(r.assigned_to)}</div>{r.assigned_to}</div>)}</div>);})}</div>)}</div></div>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>{!sel ? (<div className="rd-panel" style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--txt3)', fontSize: 13 }}><div style={{ fontSize: 36, marginBottom: 12, opacity: .4 }}>←</div>Sélectionnez un rapport pour commencer la validation</div>) : (<><div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(139,92,246,.15)', borderRadius: 16, padding: '18px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}><div><div style={{ fontSize: 18, fontWeight: 800, color: '#e8fff6', fontFamily: "'Syne',sans-serif" }}>{sel.company_name}</div><div style={{ fontSize: 12, color: 'var(--txt3)', marginTop: 3 }}>#RPT-{String(sel.id).padStart(4, '0')} · {sel.sector}{sel.assigned_to && <> · <span style={{ color: '#a78bfa' }}>{sel.assigned_to}</span></>}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ textAlign: 'center' }}><div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: sel.compliance_score >= 75 ? '#4ade80' : sel.compliance_score >= 55 ? '#fbbf24' : '#f87171' }}>{sel.compliance_score}%</div><div style={{ fontSize: 10, color: 'var(--txt3)' }}>Conformité</div></div><div style={{ width: 1, height: 32, background: 'rgba(255,255,255,.08)' }} /><div style={{ textAlign: 'center' }}><div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: '#a78bfa' }}>{sel.maturity_level ?? '—'}<span style={{ fontSize: 13 }}>/5</span></div><div style={{ fontSize: 10, color: 'var(--txt3)' }}>Maturité</div></div><StatusBadge status={sel.status} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}><div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: '16px 18px' }}><div style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt3)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 14 }}>Indicateurs clés</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>{[{ label: 'RSSI', val: sel.has_rssi, bool: true }, { label: 'PSSI', val: sel.has_pssi, bool: true }, { label: 'MFA', val: sel.mfa_enabled, bool: true }, { label: 'PCA testé', val: sel.pca_test_done, bool: true }, { label: 'Pare-feu', val: sel.has_firewall, bool: true }, { label: 'ISO 27001', val: sel.iso27001_certified, bool: true }, { label: 'Vulns critiques', val: sel.critical_vulns_open != null ? String(sel.critical_vulns_open) : '—', bool: false }, { label: 'Nb serveurs', val: sel.total_servers != null ? String(sel.total_servers) : '—', bool: false }].map(({ label, val, bool }) => (<div key={label} style={{ padding: '8px 10px', background: 'rgba(255,255,255,.03)', borderRadius: 9, border: '1px solid rgba(255,255,255,.05)' }}><div style={{ fontSize: 10, color: 'var(--txt3)', marginBottom: 4 }}>{label}</div><div style={{ fontSize: 13, fontWeight: 600, color: bool ? (val === true ? '#34d399' : val === false ? '#f87171' : '#64748b') : '#e2e8f0' }}>{bool ? (val === true ? '✓ Oui' : val === false ? '✕ Non' : '—') : val}</div></div>))}</div></div><div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: '16px 18px', display: 'flex', flexDirection: 'column' }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt3)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Annotations du chargé</span>{isAuto && (<span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(99,102,241,.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,.25)' }}>AUTO-GÉNÉRÉES • Basées sur les données</span>)}{hasRealAnnotations && (<span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(16,185,129,.12)', color: '#34d399', border: '1px solid rgba(16,185,129,.2)' }}>RAPPORT CHARGE</span>)}</div><div style={{ display: 'flex', gap: 5 }}>{['remarque', 'reserve', 'recommandation'].map(t => { const n = annotations.filter(a => a.type === t).length; return (<span key={t} style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: annBg[t], color: annColors[t] }}>{n}</span>); })}</div></div><div style={{ flex: 1, overflowY: 'auto', maxHeight: 230, display: 'flex', flexDirection: 'column', gap: 7 }}>{annLoading ? (<div style={{ fontSize: 12, color: 'var(--txt3)', textAlign: 'center', padding: '20px 0' }}>Chargement…</div>) : annotations.length === 0 ? (<div style={{ fontSize: 12, color: 'var(--txt3)', textAlign: 'center', padding: '20px 0', fontStyle: 'italic' }}>Aucune annotation disponible.</div>) : annotations.map(a => (<div key={a.id} style={{ padding: '9px 11px', background: annBg[a.type], borderLeft: `2px solid ${annBorder[a.type]}`, borderRadius: '0 8px 8px 0' }}><div style={{ fontSize: 9, fontWeight: 700, color: annColors[a.type], textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>{a.type} · {a.target}</div><div style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.5 }}>{a.text}</div><div style={{ fontSize: 10, color: 'var(--txt3)', marginTop: 4 }}>{a.author} · {formatDate(a.sent_at || a.created_at)}{a.isAuto && <span style={{ marginLeft: 6, fontStyle: 'italic' }}>(auto-généré)</span>}</div></div>))}</div></div></div><div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: '18px 20px' }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}><span style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt3)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Checklist de validation QA</span><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 12, color: checksDone(sel.id) === 7 ? '#34d399' : 'var(--txt3)' }}>{checksDone(sel.id)}/{VALIDATION_CRITERIA.length} critères</span><div style={{ width: 80, height: 4, background: 'rgba(255,255,255,.08)', borderRadius: 99 }}><div style={{ height: '100%', borderRadius: 99, background: '#10b981', width: `${Math.round(checksDone(sel.id) / VALIDATION_CRITERIA.length * 100)}%`, transition: 'width .3s' }} /></div></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 18 }}>{VALIDATION_CRITERIA.map(c => { const checks = effectiveChecks(sel.id); const checked = !!checks[c.id]; const isAuto = !!autoChecks[c.id]; const isDone = validated[sel.id]; return (<div key={c.id} onClick={() => toggleCheckResp(sel.id, c.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: checked ? 'rgba(16,185,129,.06)' : 'rgba(255,255,255,.02)', border: `1px solid ${checked ? 'rgba(16,185,129,.2)' : 'rgba(255,255,255,.06)'}`, borderRadius: 10, cursor: 'pointer', transition: 'all .15s' }}><div style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 1, background: checked ? '#10b981' : 'rgba(255,255,255,.06)', border: `1.5px solid ${checked ? '#10b981' : 'rgba(255,255,255,.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{checked && <CheckIcon />}</div><div style={{ minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}><span style={{ fontSize: 12, fontWeight: 600, color: checked ? '#e2e8f0' : '#94a3b8' }}>{c.label}</span><span style={sevStyle(c.severity)}>{c.severity}</span>{isAuto && checked && (<span style={{ fontSize: 9, color: '#34d399', fontWeight: 700 }}>auto</span>)}</div><div style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 2, lineHeight: 1.4 }}>{c.desc}</div></div></div>); })}</div>{sel.status === 'rejeté' && (<div style={{ padding: '13px 16px', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 10, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 12 }}>✕ Rapport rejeté — retourné au chargé d'étude</div>)}<div style={{ display: 'flex', gap: 10 }}><button style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', cursor: critChecksOk(sel.id) ? 'pointer' : 'not-allowed', background: critChecksOk(sel.id) ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,.05)', color: critChecksOk(sel.id) ? '#f0fff8' : '#475569', fontSize: 13, fontWeight: 700, transition: 'all .15s' }} disabled={!critChecksOk(sel.id)} title={!critChecksOk(sel.id) ? 'Les critères CRITIQUE doivent être cochés' : ''} onClick={() => handleValidate(sel.id)}>{validated[sel.id] || sel.status === 'validé' ? '✓ Déjà validé' : sel.status === 'clôturé' ? '✓ Déjà clôturé' : '✓ Accepter (Valider)'}</button><button style={{ padding: '11px 20px', borderRadius: 10, cursor: 'pointer', background: 'rgba(239,68,68,.1)', color: '#f87171', border: '1px solid rgba(239,68,68,.25)', fontSize: 13, fontWeight: 700, transition: 'all .15s' }} onClick={() => { const reason = window.prompt('Motif de rejet (optionnel) :') ?? ''; if (reason !== null) handleReject(sel.id, reason); }}>✕ Rejeter</button></div>{!critChecksOk(sel.id) && !validated[sel.id] && sel.status !== 'rejeté' && (<div style={{ marginTop: 10, fontSize: 11, color: '#f87171', textAlign: 'center' }}>Cochez les critères <strong>CRITIQUE</strong> (intégrité + absence de biais) pour débloquer la validation</div>)}</div></>)}</div>
+        <div style={{ width: 340, flexShrink: 0 }}>
+          <div className="rd-panel" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#dff8ee' }}>Validation finale</span>
+                <span style={{ fontSize: 11, background: 'rgba(16,185,129,.12)', color: '#34d399', padding: '2px 9px', borderRadius: 99, fontWeight: 700 }}>{enAttente.length}</span>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 4 }}>Rapports soumis par les chargés d'étude</p>
+            </div>
+            {enAttente.length === 0 ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                <div style={{ fontSize: 13, color: 'var(--txt3)' }}>Aucun rapport en attente</div>
+              </div>
+            ) : (
+              <div style={{ maxHeight: 600, overflowY: 'auto' }}>
+                {enAttente.map(r => {
+                  const done = checksDone(r.id);
+                  const isSelected = String(selectedId) === String(r.id);
+                  const pct = Math.round(done / VALIDATION_CRITERIA.length * 100);
+                  const isValide = validated[r.id] || r.status === 'validé';
+                  const isCloture = r.status === 'clôturé';
+                  const isRejete = r.status === 'rejeté';
+                  return (
+                    <div key={r.id} onClick={() => setSelectedId(r.id)} style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,.04)', cursor: 'pointer', background: isSelected ? 'rgba(16,185,129,.06)' : 'transparent', borderLeft: isSelected ? '3px solid #10b981' : '3px solid transparent', transition: 'all .15s' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#e8fff6', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.company_name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--txt3)' }}>#RPT-{String(r.id).padStart(4, '0')} · {r.sector}</div>
+                        </div>
+                        {isCloture ? (<span style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 700, whiteSpace: 'nowrap' }}>✓ Clôturé</span>) : isValide ? (<span style={{ fontSize: 10, color: '#34d399', fontWeight: 700, whiteSpace: 'nowrap' }}>✓ Validé</span>) : isRejete ? (<span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }}>✕ Rejeté</span>) : (<StatusBadge status={r.status} />)}
+                      </div>
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, color: 'var(--txt3)' }}>Checklist</span>
+                          <span style={{ fontSize: 10, color: done === 7 ? '#34d399' : 'var(--txt3)', fontWeight: 600 }}>{done}/{VALIDATION_CRITERIA.length}</span>
+                        </div>
+                        <div style={{ height: 3, background: 'rgba(255,255,255,.08)', borderRadius: 99 }}>
+                          <div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: pct === 100 ? '#10b981' : pct >= 57 ? '#3b82f6' : '#f59e0b', transition: 'width .3s' }} />
+                        </div>
+                      </div>
+                      {r.assigned_to && (
+                        <div style={{ marginTop: 8, fontSize: 10, color: 'var(--txt3)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(16,185,129,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: '#34d399' }}>{initials(r.assigned_to)}</div>
+                          {r.assigned_to}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {!sel ? (
+            <div className="rd-panel" style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--txt3)', fontSize: 13 }}>
+              <div style={{ fontSize: 36, marginBottom: 12, opacity: .4 }}>←</div>
+              Sélectionnez un rapport pour commencer la validation
+            </div>
+          ) : (
+            <>
+              <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(139,92,246,.15)', borderRadius: 16, padding: '18px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#e8fff6', fontFamily: "'Syne',sans-serif" }}>{sel.company_name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--txt3)', marginTop: 3 }}>#RPT-{String(sel.id).padStart(4, '0')} · {sel.sector}{sel.assigned_to && <> · <span style={{ color: '#a78bfa' }}>{sel.assigned_to}</span></>}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: sel.compliance_score >= 75 ? '#4ade80' : sel.compliance_score >= 55 ? '#fbbf24' : '#f87171' }}>{sel.compliance_score}%</div>
+                    <div style={{ fontSize: 10, color: 'var(--txt3)' }}>Conformité</div>
+                  </div>
+                  <div style={{ width: 1, height: 32, background: 'rgba(255,255,255,.08)' }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'Syne',sans-serif", color: '#a78bfa' }}>{sel.maturity_level ?? '—'}<span style={{ fontSize: 13 }}>/5</span></div>
+                    <div style={{ fontSize: 10, color: 'var(--txt3)' }}>Maturité</div>
+                  </div>
+                  <StatusBadge status={sel.status} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: '16px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt3)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 14 }}>Indicateurs clés</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {INDICATORS.map(({ label, val, bool, annexe, source }) => (
+                      <div key={label} style={{ padding: '8px 10px', background: 'rgba(255,255,255,.03)', borderRadius: 9, border: '1px solid rgba(255,255,255,.05)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--txt3)', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{label}</span>
+                          {source && (<span style={{ fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: source.startsWith('Annexe') ? 'rgba(16,185,129,.12)' : 'rgba(99,102,241,.12)', color: source.startsWith('Annexe') ? '#34d399' : '#818cf8' }}>{source}</span>)}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: bool ? (val === true ? '#34d399' : val === false ? '#f87171' : '#64748b') : '#e2e8f0' }}>
+                          {bool ? (val === true ? '✓ Oui' : val === false ? '✕ Non' : '—') : val}
+                        </div>
+                        <div style={{ fontSize: 9, color: '#3e7060', marginTop: 5, borderTop: '1px solid rgba(16,185,129,.08)', paddingTop: 5, lineHeight: 1.3 }}>{annexe}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: '16px 18px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt3)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Annotations du chargé</span>
+                      {isAuto && (<span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(99,102,241,.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,.25)' }}>AUTO-GÉNÉRÉES • Basées sur les données</span>)}
+                      {hasRealAnnotations && (<span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(16,185,129,.12)', color: '#34d399', border: '1px solid rgba(16,185,129,.2)' }}>RAPPORT CHARGE</span>)}
+                    </div>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      {['remarque', 'reserve', 'recommandation'].map(t => {
+                        const n = annotations.filter(a => a.type === t).length;
+                        return (<span key={t} style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: annBg[t], color: annColors[t] }}>{n}</span>);
+                      })}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto', maxHeight: 230, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    {annLoading ? (
+                      <div style={{ fontSize: 12, color: 'var(--txt3)', textAlign: 'center', padding: '20px 0' }}>Chargement…</div>
+                    ) : annotations.length === 0 ? (
+                      <div style={{ fontSize: 12, color: 'var(--txt3)', textAlign: 'center', padding: '20px 0', fontStyle: 'italic' }}>Aucune annotation disponible.</div>
+                    ) : annotations.map(a => (
+                      <div key={a.id} style={{ padding: '9px 11px', background: annBg[a.type], borderLeft: `2px solid ${annBorder[a.type]}`, borderRadius: '0 8px 8px 0' }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: annColors[a.type], textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 3 }}>{a.type} · {a.target}</div>
+                        <div style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.5 }}>{a.text}</div>
+                        <div style={{ fontSize: 10, color: 'var(--txt3)', marginTop: 4 }}>{a.author} · {formatDate(a.sent_at || a.created_at)}{a.isAuto && <span style={{ marginLeft: 6, fontStyle: 'italic' }}>(auto-généré)</span>}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: '18px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt3)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Checklist de validation QA</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 12, color: checksDone(sel.id) === 7 ? '#34d399' : 'var(--txt3)' }}>{checksDone(sel.id)}/{VALIDATION_CRITERIA.length} critères</span>
+                    <div style={{ width: 80, height: 4, background: 'rgba(255,255,255,.08)', borderRadius: 99 }}>
+                      <div style={{ height: '100%', borderRadius: 99, background: '#10b981', width: `${Math.round(checksDone(sel.id) / VALIDATION_CRITERIA.length * 100)}%`, transition: 'width .3s' }} />
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 18 }}>
+                  {VALIDATION_CRITERIA.map(c => {
+                    const checks = effectiveChecks(sel.id);
+                    const checked = !!checks[c.id];
+                    const isAuto = !!autoChecks[c.id];
+                    const isDone = validated[sel.id];
+                    return (
+                      <div key={c.id} onClick={() => toggleCheckResp(sel.id, c.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: checked ? 'rgba(16,185,129,.06)' : 'rgba(255,255,255,.02)', border: `1px solid ${checked ? 'rgba(16,185,129,.2)' : 'rgba(255,255,255,.06)'}`, borderRadius: 10, cursor: 'pointer', transition: 'all .15s' }}>
+                        <div style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 1, background: checked ? '#10b981' : 'rgba(255,255,255,.06)', border: `1.5px solid ${checked ? '#10b981' : 'rgba(255,255,255,.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{checked && <CheckIcon />}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: checked ? '#e2e8f0' : '#94a3b8' }}>{c.label}</span>
+                            <span style={sevStyle(c.severity)}>{c.severity}</span>
+                            {isAuto && checked && (<span style={{ fontSize: 9, color: '#34d399', fontWeight: 700 }}>auto</span>)}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 2, lineHeight: 1.4 }}>{c.desc}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {sel.status === 'rejeté' && (
+                  <div style={{ padding: '13px 16px', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 10, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 12 }}>
+                    ✕ Rapport rejeté — retourné au chargé d'étude
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', cursor: critChecksOk(sel.id) ? 'pointer' : 'not-allowed', background: critChecksOk(sel.id) ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(255,255,255,.05)', color: critChecksOk(sel.id) ? '#f0fff8' : '#475569', fontSize: 13, fontWeight: 700, transition: 'all .15s' }} disabled={!critChecksOk(sel.id)} title={!critChecksOk(sel.id) ? 'Les critères CRITIQUE doivent être cochés' : ''} onClick={() => handleValidate(sel.id)}>
+                    {validated[sel.id] || sel.status === 'validé' ? '✓ Déjà validé' : sel.status === 'clôturé' ? '✓ Déjà clôturé' : '✓ Accepter (Valider)'}
+                  </button>
+                  <button style={{ padding: '11px 20px', borderRadius: 10, cursor: 'pointer', background: 'rgba(239,68,68,.1)', color: '#f87171', border: '1px solid rgba(239,68,68,.25)', fontSize: 13, fontWeight: 700, transition: 'all .15s' }} onClick={() => { const reason = window.prompt('Motif de rejet (optionnel) :') ?? ''; if (reason !== null) handleReject(sel.id, reason); }}>
+                    ✕ Rejeter
+                  </button>
+                </div>
+                {!critChecksOk(sel.id) && !validated[sel.id] && sel.status !== 'rejeté' && (
+                  <div style={{ marginTop: 10, fontSize: 11, color: '#f87171', textAlign: 'center' }}>
+                    Cochez les critères <strong>CRITIQUE</strong> (intégrité + absence de biais) pour débloquer la validation
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     );
   };
 
-  // ═════════════════════════════════════════════════════════════════
-  //  ONGLET 3: VUE DÉCIDEUR
-  // ═════════════════════════════════════════════════════════════════
-  const TabDecideur = () => <ResponsableDecideurView reports={reports} />;
-
-  // ═════════════════════════════════════════════════════════════════
-  //  ONGLET 4: KPIs (Définition des indicateurs de sécurité)
-  // ═════════════════════════════════════════════════════════════════
-  const TabIndicateurs = () => (
-    <div className="rd-grid-2eq">
-      <div className="rd-panel">
-        <div className="rd-panel-hd">
-          <h2>KPIs de sécurité définis</h2>
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <span style={{ fontSize:11, color:'var(--txt3)' }}>{kpis.length} locaux</span>
-            {published.filter(p => p.type === 'kpi').length > 0 && (<span style={{ fontSize:10, padding:'2px 8px', borderRadius:99, background:'rgba(16,185,129,.15)', color:'#34d399', fontWeight:700 }}>{published.filter(p => p.type === 'kpi').length} publiés ✓</span>)}
-          </div>
-        </div>
-        <div className="rd-panel-bd">
-          {kpis.map(k => {
-            const status = publishStatus[k.id];
-            const isPublished = published.some(p => p.name === k.name && p.type === 'kpi');
-            return (<div key={k.id} className="rd-kpi-card"><div className="rd-kpi-header"><span className="rd-kpi-name">{k.name}</span><div style={{ display:'flex', gap:6 }}><button title={isPublished ? 'Déjà publié vers le Décideur' : 'Publier vers le Décideur'} onClick={() => publishKpiToDecideur(k)} disabled={status === 'publishing'} style={{ background: isPublished ? 'rgba(16,185,129,.12)' : status === 'done' ? 'rgba(16,185,129,.18)' : 'rgba(59,130,246,.1)', border: `1px solid ${isPublished || status === 'done' ? 'rgba(16,185,129,.4)' : 'rgba(59,130,246,.3)'}`, borderRadius:7, padding:'3px 9px', fontSize:11, fontWeight:700, color: isPublished || status === 'done' ? '#34d399' : '#60a5fa', cursor: status === 'publishing' ? 'wait' : 'pointer', transition:'all .2s' }}>{status === 'publishing' ? '↑ Envoi…' : status === 'done' ? '✓ Publié' : isPublished ? '✓ Partagé' : '↑ Publier'}</button><button className="rd-kpi-del" onClick={() => setKpis(p => p.filter(x => x.id !== k.id))}>×</button></div></div><div className="rd-kpi-formula">{k.formula}</div><div className="rd-kpi-value">{evalKpi(k.formula)}{k.type === 'Taux (%)' ? '%' : ''}</div>{isPublished && (<div style={{ fontSize:10, color:'#34d399', marginTop:4 }}>✓ Visible par le Décideur</div>)}</div>);
-          })}
-          <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid rgba(255,255,255,.07)' }}>
-            <p className="rd-label" style={{ marginBottom:8 }}>Nouveau KPI de sécurité</p>
-            <input className="rd-input" style={{ marginBottom:8 }} placeholder="ex: Taux d'organismes avec RSSI" value={kpiForm.name} onChange={e => setKpiForm(p => ({ ...p, name: e.target.value }))} />
-            <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{['total','validés','affectés','en_attente','+','−','×','÷','(',')','/','100'].map(tok => (<button key={tok} onClick={() => appendToken(tok)} style={{ padding:'3px 8px', background:'rgba(16,185,129,.1)', border:'1px solid rgba(16,185,129,.2)', borderRadius:6, color:'#7eefc6', fontSize:11, cursor:'pointer', fontFamily:'monospace' }}>{tok}</button>))}<button onClick={() => { setFormulaTokens([]); setKpiForm(p => ({ ...p, formula: '' })); }} style={{ padding:'3px 8px', background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.2)', borderRadius:6, color:'#f87171', fontSize:11, cursor:'pointer' }}>✕</button></div>
-            <input className="rd-input" style={{ marginBottom:8 }} placeholder="Formule: (validés / total) × 100" value={kpiForm.formula} onChange={e => setKpiForm(p => ({ ...p, formula: e.target.value }))} />
-            <select className="rd-select" style={{ marginBottom:10 }} value={kpiForm.type} onChange={e => setKpiForm(p => ({ ...p, type: e.target.value }))}>{KPI_TYPES.map(t => <option key={t}>{t}</option>)}</select>
-            <button className="rd-btn primary" style={{ width:'100%' }} onClick={addKpi}>Ajouter l'indicateur</button>
-          </div>
-        </div>
+  // ═══════════════════════════════════════════════════════════════
+  //  TAB: KPIs (Simplified - no add form)
+  // ═══════════════════════════════════════════════════════════════
+     const TabIndicateurs = () => (
+    <div className="rd-panel">
+      <div className="rd-panel-hd">
+        <h2>KPIs de sécurité</h2>
+        <span style={{ fontSize:11, color:'var(--txt3)' }}>{kpis.length} indicateur{kpis.length !== 1 ? 's' : ''}</span>
       </div>
-      <div className="rd-panel">
-        <div className="rd-panel-hd"><h2>Pondération des critères QA</h2></div>
-        <div className="rd-panel-bd">
-          <div style={{ marginBottom:12, fontSize:12, color:'var(--txt3)' }}>Score qualité global : <strong style={{ color:'#a78bfa' }}>{weightedScore}%</strong></div>
-          {weightItems.map(w => (<div key={w.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}><span style={{ flex:1, fontSize:12, color:'#c8eed8' }}>{w.label}</span><input type="number" min="0" max="100" value={w.weight} onChange={e => setWeightItems(p => p.map(x => x.id === w.id ? { ...x, weight: Number(e.target.value) } : x))} style={{ width:55, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, padding:'5px 8px', color:'var(--txt)', fontSize:12, outline:'none' }} /><span style={{ fontSize:11, color:'var(--txt3)', width:20 }}>%</span></div>))}
-        </div>
-      </div>
-      <div className="rd-panel" style={{ marginTop:16, gridColumn:'1 / -1' }}>
-        <div className="rd-panel-hd"><h2>📤 Indicateurs partagés avec le Décideur</h2><span style={{ fontSize:11, color:'var(--txt3)' }}>{published.length} élément{published.length !== 1 ? 's' : ''}</span></div>
-        <div className="rd-panel-bd">{published.length === 0 ? (<div className="rd-empty">Aucun indicateur partagé. Utilisez le bouton "Publier" sur un KPI pour le rendre visible au Décideur.</div>) : (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>{published.map(p => (<div key={p.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', background: p.type === 'kpi' ? 'rgba(16,185,129,.05)' : 'rgba(59,130,246,.05)', border: `1px solid ${p.type === 'kpi' ? 'rgba(16,185,129,.15)' : 'rgba(59,130,246,.15)'}`, borderRadius:10 }}><div><span style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color: p.type === 'kpi' ? '#34d399' : '#60a5fa', marginRight:8 }}>{p.type === 'kpi' ? 'KPI' : 'Tableau de bord'}</span><span style={{ fontSize:13, fontWeight:600, color:'#c8eed8' }}>{p.name}</span><div style={{ fontSize:10, color:'var(--txt3)', marginTop:2 }}>Partagé par {p.created_by} · {new Date(p.created_at).toLocaleDateString('fr-FR')}</div></div><button onClick={() => unpublish(p.id)} style={{ background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.2)', borderRadius:7, padding:'4px 10px', fontSize:11, fontWeight:700, color:'#f87171', cursor:'pointer' }}>Retirer</button></div>))}</div>)}</div>
+      <div className="rd-panel-bd">
+        {kpis.length === 0 ? (
+          <div className="rd-empty">Aucun KPI défini pour le moment.</div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:14 }}>
+            {kpis.map(k => {
+              const isPublished = published.some(p => p.name === k.name && p.type === 'kpi');
+              const status = publishStatus[k.id];
+              return (
+                <div key={k.id} className="rd-kpi-card">
+                  <div className="rd-kpi-header">
+                    <span className="rd-kpi-name">{k.name}</span>
+                    {isPublished && (
+                      <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:99, background:'rgba(16,185,129,.15)', color:'#34d399' }}>✓ Partagé</span>
+                    )}
+                  </div>
+                  <div className="rd-kpi-formula">{k.formula}</div>
+                  <div className="rd-kpi-value">
+                    {evalKpi(k.formula)}{k.type === 'Taux (%)' ? '%' : ''}
+                  </div>
+                  <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                    <button
+                      title={isPublished ? 'Déjà publié' : 'Publier vers le Décideur'}
+                      onClick={() => publishKpiToDecideur(k)}
+                      disabled={status === 'publishing' || isPublished}
+                      style={{
+                        flex:1, padding:'6px 10px', borderRadius:8,
+                        border:'1px solid rgba(16,185,129,.3)',
+                        background: isPublished ? 'rgba(16,185,129,.08)' : 'rgba(16,185,129,.12)',
+                        color: isPublished ? '#34d399' : '#7eefc6',
+                        fontSize:11, fontWeight:700,
+                        cursor: isPublished ? 'default' : 'pointer'
+                      }}
+                    >
+                      {isPublished ? '✓ Publié' : status === 'publishing' ? 'Envoi…' : '↑ Publier'}
+                    </button>
+                    <button
+                      className="rd-kpi-del"
+                      onClick={() => setKpis(prev => prev.filter(x => x.id !== k.id))}
+                      title="Supprimer ce KPI"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
 
-  // ═════════════════════════════════════════════════════════════════
-  //  CONFIGURATION DES ONGLETS
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
+  //  TABS CONFIG (Vue Décideur removed)
+  // ═══════════════════════════════════════════════════════════════
   const TABS = [
     { key:'rapports',     label:'Rapports',           icon:'≡', badge:total, badgeNew: unassignedCount > 0 },
     { key:'validation',   label:'Validation QA',      icon:'✓', badge:enAttenteCount },
-    { key:'decideur',     label:'Vue Décideur',       icon:'📊' },
     { key:'indicateurs',  label:'KPIs Sécurité',      icon:'∿', badge:kpis.length },
   ];
 
-  // ═════════════════════════════════════════════════════════════════
-  //  RENDU PRINCIPAL
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
+  //  RENDER
+  // ═══════════════════════════════════════════════════════════════
   return (
     <div className="rd-root">
       <style>{CSS}</style>
@@ -1176,10 +1428,9 @@ export default function ResponsableDashboard() {
           ))}
         </div>
 
-        {/* ── SECTION RENDU ── */}
+        {/* ── SECTION RENDER ── */}
         {section === 'rapports'     && <TabRapports />}
         {section === 'validation'   && <TabValidation />}
-        {section === 'decideur'     && <TabDecideur />}
         {section === 'indicateurs'  && <TabIndicateurs />}
       </div>
     </div>

@@ -117,7 +117,7 @@ const NAV_LINKS = [
 function normalizeNotif(row) {
   return {
     id:         row.id,
-    dossierId:  row.dossier_id   ?? row.dossierId   ?? '',
+    dossierId:  row.related_report_id ?? row.dossier_id ?? row.dossierId ?? '',
     organisme:  row.organisme    ?? '',
     type:       row.type         ?? 'depose',
     etape:      row.etape        ?? 1,

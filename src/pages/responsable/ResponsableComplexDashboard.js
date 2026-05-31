@@ -1,11 +1,7 @@
 import React, { useMemo } from 'react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
-import { 
-  T, S, computeStats, 
-  ImplementationTracker, 
-  TechnicalHealthMetrics, 
-  MaturityRadar 
-} from '../decideur/DecideurDashboard';
+import { T, S } from '../../theme';
+import { computeStats, ImplementationTracker, TechnicalHealthMetrics, MaturityRadar } from '../decideur/DecideurDashboard';
 
 // Dummy trend data for KPI cards mini-charts
 const trendData = [

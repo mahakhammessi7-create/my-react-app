@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import supabase from '../lib/supabaseClient';
+import { normalizeStatus } from '../lib/statusHelper';
 
 export const useMyAssignedReports = (userId, onNewAssignment = null) => {
   const [reports, setReports] = useState([]);
@@ -21,12 +22,15 @@ export const useMyAssignedReports = (userId, onNewAssignment = null) => {
       const { data, error: sbError } = await supabase
         .from('reports')
         .select('*')
-        .eq('assigned_to', userId)
+        .eq('assigned_charge', userId)
         .order('upload_date', { ascending: false });
 
       if (sbError) throw new Error(sbError.message);
 
-      const incoming = data || [];
+      const incoming = (data || []).map(r => ({
+        ...r,
+        status: normalizeStatus(r.status),
+      }));
       const incomingIds = new Set(incoming.map(r => r.id));
       if (prevIdsRef.current.size > 0) {
         incoming
@@ -55,7 +59,7 @@ export const useMyAssignedReports = (userId, onNewAssignment = null) => {
     const channel = supabase
       .channel(`my-reports-user-${userId}`)
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'reports', filter: `assigned_to=eq.${userId}` },
+        { event: '*', schema: 'public', table: 'reports', filter: `assigned_charge=eq.${userId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') onNewAssignmentRef.current?.(payload.new);
           fetchAssignedReports();
@@ -65,23 +69,28 @@ export const useMyAssignedReports = (userId, onNewAssignment = null) => {
     return () => supabase.removeChannel(channel);
   }, [userId, fetchAssignedReports]);
 
-  // ── Validate → 'validé' ──────────────────────────────────────────────────
+  // ── Validate → 'valide_tech' (Appelle le backend pour les notifications) ──
   const validateReport = useCallback(async (reportId) => {
     try {
+      const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      
+      const res = await fetch(`${API_BASE}/reports/${reportId}/valider-tech`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Erreur lors de la validation technique');
+      }
+
       const now = new Date().toISOString();
-      const { error: e } = await supabase
-        .from('reports')
-        .update({ status: 'validé', validated_by: userId, reviewed_at: now })
-        .eq('id', reportId);
-      if (e) throw new Error(e.message);
-
-      await supabase.from('notifications').insert({
-        type: 'report_validated', report_id: reportId, created_by: userId,
-        message: `Le rapport #${reportId} a été validé.`, read: false,
-      }).throwOnError().catch(() => {});
-
       setReports(prev => prev.map(r =>
-        r.id === reportId ? { ...r, status: 'validé', reviewed_at: now } : r
+        r.id === reportId ? { ...r, status: 'en_validation', reviewed_at: now } : r
       ));
       return { success: true };
     } catch (err) {

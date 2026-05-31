@@ -2,9 +2,9 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage      from './pages/LoginPage';
 import RegisterPage   from './pages/RegisterPage';
-import AdminLoginPage from './pages/AdminloginPage';
-import ChargeEtudeLoginPage from './pages/ChargeEtudeLoginPage';
-import ResponsableLoginPage from './pages/ResponsableLoginPage';
+import UnifiedLoginPage from './pages/UnifiedLoginPage';
+
+
 import AuditForm from './components/Module1_Conformity/AuditForm';
 import AdminHub  from './pages/admin/AdminHub';
 import ResponsableDashboard from './pages/responsable/ResponsableDashboard';
@@ -17,7 +17,7 @@ import ExpertManagement from './pages/admin/ExpertManagement';
 import TechnicalReviewInterface from './components/Module3_TechnicalReview/TechnicalReviewInterface';
 import ChargeEtudeDashboard from './pages/charge-etude/ChargeEtudeDashboard';
 import ChargeEtudeProfile from './pages/charge-etude/ChargeEtudeProfile';
-import DecideurLoginPage  from './pages/DecideurLoginpage';
+
 import DecideurDashboard  from './pages/decideur/DecideurDashboard';
 
 function App() {
@@ -25,37 +25,40 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* ── Public ── */}
-        <Route path="/"               element={<LoginPage />}       />
-        <Route path="/register"       element={<RegisterPage />}    />
-        {/* ── Admin login caché — URL secrète, non linkée ── */}
-        <Route path="/secure-access"  element={<AdminLoginPage />}  />
-        {/* ── Charge d'Étude login ── */}
-        <Route path="/charge-etude-login"  element={<ChargeEtudeLoginPage />}  />
-        <Route path="/responsable-login"   element={<ResponsableLoginPage />}   />
-        {/* ── Dashboards ── */}
-        <Route path="/client/dashboard" element={<AuditForm />} />
-        <Route path="/admin/dashboard"  element={<AdminHub />}  />
-        <Route path="/responsable/dashboard" element={<ResponsableDashboard />} />
+        <Route path="/"        element={<LoginPage />}       />  {/* clients */}
+        <Route path="/login"   element={<UnifiedLoginPage />} /> {/* membres ANCS */}
+        <Route path="/register" element={<RegisterPage />}   />
+
         {/* ── Admin ── */}
-        <Route path="/admin/experts" element={<ExpertManagement />} />
-        <Route path="/admin/users"      element={<UserManagement />}  />
-        {/* ── ✅ New client pages ── */}
-        <Route path="/client/profile"        element={<ClientDashboard />}   />
-        <Route path="/client/notifications"  element={<NotificationsPage />} />
-        <Route path="/client/guide"          element={<GuidePage />}         />
-        <Route path="/client/contact"        element={<ContactPage />}       />
-        {/* ── Charge d'Étude Dashboard ── */}
-        
-        <Route path="/charge-etude/dashboard"  element={<ChargeEtudeDashboard />} />
-        <Route path="/charge-etude/profile"    element={<ChargeEtudeProfile />} />
-        {/* ── Technical Review Interface ── */}
-        <Route path="/technical-review"      element={<TechnicalReviewInterface />} />
-        <Route path="/decideur/login"     element={<DecideurLoginPage />} />
+        <Route path="/admin/dashboard"  element={<AdminHub />}         />
+        <Route path="/admin/experts"    element={<ExpertManagement />} />
+        <Route path="/admin/users"      element={<UserManagement />}   />
+
+        {/* ── Responsable ── */}
+        <Route path="/responsable/dashboard" element={<ResponsableDashboard />} />
+
+        {/* ── Chargé d'Étude ── */}
+        <Route path="/charge-etude/dashboard" element={<ChargeEtudeDashboard />} />
+        <Route path="/charge-etude/profile"   element={<ChargeEtudeProfile />}   />
+
+        {/* ── Décideur ── */}
         <Route path="/decideur/dashboard" element={<DecideurDashboard />} />
+
+        {/* ── Client ── */}
+        <Route path="/client/dashboard"     element={<AuditForm />}         />
+        <Route path="/client/profile"       element={<ClientDashboard />}   />
+        <Route path="/client/notifications" element={<NotificationsPage />} />
+        <Route path="/client/guide"         element={<GuidePage />}         />
+        <Route path="/client/contact"       element={<ContactPage />}       />
+
+        {/* ── Autres ── */}
+        <Route path="/technical-review" element={<TechnicalReviewInterface />} />
+
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
 }
+
 export default App;

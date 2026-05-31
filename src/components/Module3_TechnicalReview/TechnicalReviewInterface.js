@@ -1,30 +1,25 @@
 // components/Module3_TechnicalReview/TechnicalReviewInterface.jsx
 // Layout: LEFT = Annexes viewer (raw data) | RIGHT = Extracted data editor + Annotations
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAnnotations } from '../../hooks/Useannotations';
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 const CSS = `
-/* Root layout: 2 cols */
 .tri-root { display: grid; grid-template-columns: 1fr 1.4fr; gap: 20px; align-items: start; }
 @media (max-width: 1100px) { .tri-root { grid-template-columns: 1fr; } }
 
-/* Cards */
 .tri-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(139,92,246,0.12); border-radius: 14px; overflow: hidden; }
 .tri-card-head { padding: 12px 16px; border-bottom: 1px solid rgba(139,92,246,0.1); display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.15); }
 .tri-card-head h3 { font-size: 14px; font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 6px; }
 
-/* Sticky columns */
 .tri-left-col { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
 .tri-right-col { min-width: 0; }
 
-/* Scrollbar */
 .tri-left-col::-webkit-scrollbar { width: 4px; }
 .tri-left-col::-webkit-scrollbar-track { background: transparent; }
 .tri-left-col::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.3); border-radius: 99px; }
 
-/* Annexe sections in left panel */
 .tri-annex-section { border-bottom: 1px solid rgba(139,92,246,0.08); }
 .tri-annex-section:last-child { border-bottom: none; }
 .tri-annex-header { padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background .15s; }
@@ -34,29 +29,27 @@ const CSS = `
 .tri-annex-chevron.open { transform: rotate(180deg); }
 .tri-annex-body { padding: 12px 16px; background: rgba(0,0,0,0.1); }
 
-/* Raw data KV */
 .tri-raw-kv { display: flex; flex-direction: column; gap: 6px; }
 .tri-raw-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .tri-raw-row:last-child { border-bottom: none; }
 .tri-raw-label { color: #64748b; min-width: 140px; flex-shrink: 0; }
-.tri-raw-value { color: #e2e8f0; text-align: right; word-break: break-all; } 
+.tri-raw-value { color: #e2e8f0; text-align: right; word-break: break-all; }
 .tri-raw-value.bool-true  { color: #34d399; font-weight: 600; }
 .tri-raw-value.bool-false { color: #f87171; font-weight: 600; }
 .tri-raw-value.num { color: #a78bfa; font-weight: 600; }
+.tri-raw-value.warn { color: #fbbf24; font-weight: 600; }
+.tri-raw-value.crit { color: #f87171; font-weight: 700; }
 
-/* Table in annexe */
 .tri-raw-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .tri-raw-table th { padding: 6px 8px; text-align: left; color: #475569; font-weight: 600; border-bottom: 1px solid rgba(139,92,246,0.1); }
 .tri-raw-table td { padding: 6px 8px; color: #cbd5e1; border-bottom: 1px solid rgba(255,255,255,0.03); }
 
-/* Badges */
 .tri-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
 .tri-badge-ok  { background: rgba(16,185,129,0.15);  color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
 .tri-badge-mid { background: rgba(245,158,11,0.15);  color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
 .tri-badge-err { background: rgba(239,68,68,0.15);   color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
 .tri-badge-info{ background: rgba(99,102,241,0.15);  color: #818cf8; border: 1px solid rgba(99,102,241,0.25); }
 
-/* Buttons */
 .tri-btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
 .tri-btn-edit   { background: rgba(99,102,241,0.2); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
 .tri-btn-save   { background: linear-gradient(135deg,#10b981,#059669); color:#fff; }
@@ -69,11 +62,9 @@ const CSS = `
 .tri-btn-approve { padding:9px 18px; background:linear-gradient(135deg,#10b981,#059669); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; }
 .tri-btn-reject-main { padding:9px 18px; background:rgba(239,68,68,0.12); color:#f87171; border:1px solid rgba(239,68,68,0.3); border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; }
 
-/* Score bar */
 .tri-score-bar { height:8px; background:rgba(255,255,255,0.08); border-radius:99px; overflow:hidden; margin-bottom:16px; }
 .tri-score-fill { height:100%; border-radius:99px; transition:width .4s ease; }
 
-/* Annotation section inside right col */
 .tri-ann-section { margin-top: 20px; }
 .tri-ann-form { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .tri-form-group { display: flex; flex-direction: column; gap: 4px; }
@@ -106,27 +97,228 @@ const CSS = `
 .tri-toast { position:fixed; bottom:24px; right:24px; padding:12px 20px; border-radius:8px; background:#10b981; color:#fff; font-size:14px; font-weight:500; z-index:1200; animation:slideIn .3s ease; }
 .tri-toast.error { background:#ef4444; }
 @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+
+/* ── Right panel new styles ── */
+.syn-kpi-bar { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:12px 14px; background:rgba(0,0,0,0.12); border-bottom:1px solid rgba(139,92,246,0.1); }
+.syn-kpi { text-align:center; padding:8px 6px; background:rgba(255,255,255,0.03); border-radius:10px; border:1px solid rgba(139,92,246,0.1); }
+.syn-kpi-val { font-size:20px; font-weight:700; }
+.syn-kpi-lbl { font-size:10px; color:#64748b; margin-top:2px; }
+
+.syn-section { background:rgba(255,255,255,0.02); border:1px solid rgba(139,92,246,0.12); border-radius:12px; overflow:hidden; }
+.syn-section.annotated { border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.03); }
+.syn-head { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(0,0,0,0.15); border-bottom:1px solid rgba(139,92,246,0.1); cursor:pointer; user-select:none; }
+.syn-head:hover { background:rgba(139,92,246,0.08); }
+.syn-head-left { display:flex; flex-direction:column; gap:2px; }
+.syn-head-title { font-size:13px; font-weight:700; color:#e2e8f0; display:flex; align-items:center; gap:6px; }
+.syn-head-source { font-size:10.5px; color:#a78bfa; font-weight:500; margin-left:18px; }
+.syn-annotate-hint { font-size:10px; color:#475569; display:flex; align-items:center; gap:4px; }
+.syn-body { padding:14px; }
+
+.syn-kv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; }
+.syn-kv-item { position:relative; padding:8px 10px; background:rgba(255,255,255,0.03); border-radius:8px; border:1px solid rgba(139,92,246,0.08); }
+.syn-kv-item:hover { border-color:rgba(139,92,246,0.25); }
+.syn-kv-label { font-size:10px; color:#64748b; margin-bottom:3px; }
+.syn-kv-value { font-size:13px; font-weight:500; color:#e2e8f0; min-height:20px; }
+.syn-kv-value.modified { color:#818cf8; }
+.syn-kv-input { width:100%; background:transparent; border:none; border-bottom:1.5px solid #818cf8; outline:none; font-size:13px; font-weight:500; color:#e2e8f0; padding:1px 0; font-family:inherit; }
+.syn-edit-btn { position:absolute; top:6px; right:6px; background:none; border:none; cursor:pointer; color:#475569; font-size:11px; opacity:0; transition:opacity .15s; padding:2px 4px; border-radius:4px; }
+.syn-edit-btn:hover { color:#a78bfa; background:rgba(139,92,246,0.15); }
+.syn-kv-item:hover .syn-edit-btn { opacity:1; }
+.syn-modified-dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#818cf8; margin-left:4px; vertical-align:middle; }
+
+.syn-alert-bar { display:flex; align-items:center; gap:8px; padding:7px 12px; background:rgba(239,68,68,0.08); border-bottom:1px solid rgba(239,68,68,0.2); font-size:12px; color:#fca5a5; }
+
+.syn-tabs { display:flex; gap:0; background:rgba(0,0,0,0.15); border-bottom:1px solid rgba(139,92,246,0.1); overflow-x:auto; }
+.syn-tab { padding:8px 14px; font-size:12px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; transition:all .15s; }
+.syn-tab:hover { color:#c4b5fd; }
+.syn-tab.active { color:#c4b5fd; border-bottom-color:#8b5cf6; background:rgba(139,92,246,0.06); }
+.syn-tab-body { display:none; padding:12px 14px; }
+.syn-tab-body.active { display:block; }
+
+.syn-table { width:100%; border-collapse:collapse; font-size:11.5px; table-layout:fixed; }
+.syn-table th { padding:6px 8px; text-align:left; background:rgba(139,92,246,0.08); color:#c4b5fd; font-weight:600; font-size:11px; border-bottom:1px solid rgba(139,92,246,0.15); }
+.syn-table td { padding:7px 8px; border-bottom:1px solid rgba(255,255,255,0.03); color:#e2e8f0; vertical-align:middle; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.syn-table tr:last-child td { border-bottom:none; }
+.syn-table tr.eol-row td { background:rgba(239,68,68,0.04); }
+.syn-table td.editable { cursor:pointer; }
+.syn-table td.editable:hover { background:rgba(99,102,241,0.1); color:#c4b5fd; }
+.syn-inline-input { width:100%; background:rgba(99,102,241,0.1); border:none; border-bottom:1.5px solid #818cf8; outline:none; font-size:11.5px; color:#e2e8f0; padding:1px 2px; font-family:inherit; }
+
+.syn-domain-list { display:flex; flex-direction:column; gap:8px; }
+.syn-domain-row { display:grid; grid-template-columns:170px 72px 1fr; gap:10px; align-items:center; padding:8px 10px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid rgba(139,92,246,0.08); font-size:12px; }
+.syn-domain-label { font-weight:600; color:#e2e8f0; }
+.syn-domain-score { font-weight:700; font-size:13px; }
+.syn-score-bar { height:4px; border-radius:2px; overflow:hidden; background:rgba(255,255,255,0.08); margin-bottom:4px; }
+.syn-score-fill { height:100%; border-radius:2px; }
+.syn-domain-tags { display:flex; flex-wrap:wrap; gap:4px; }
+.syn-tag { font-size:10px; padding:1px 6px; border-radius:4px; }
+.syn-tag-ok  { background:rgba(16,185,129,0.12); color:#34d399; }
+.syn-tag-warn{ background:rgba(239,68,68,0.12); color:#f87171; }
+
+.syn-ind-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; }
+.syn-ind-card { background:rgba(255,255,255,0.02); border:1px solid rgba(139,92,246,0.1); border-radius:10px; padding:10px 12px; }
+.syn-ind-title { font-size:11px; font-weight:700; color:#c4b5fd; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(139,92,246,0.08); }
+.syn-ind-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.syn-ind-row:last-child { border-bottom:none; }
+.syn-ind-label { color:#94a3b8; }
+.syn-gauge-wrap { display:flex; align-items:center; gap:6px; }
+.syn-gauge { width:48px; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; }
+.syn-gauge-fill { height:100%; border-radius:2px; }
+.syn-pill { font-size:10px; font-weight:600; padding:2px 7px; border-radius:99px; }
+.syn-pill-ok   { background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.2); }
+.syn-pill-warn { background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.2); }
+.syn-pill-err  { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.2); }
+.syn-pill-info { background:rgba(99,102,241,0.15); color:#818cf8; border:1px solid rgba(99,102,241,0.2); }
+
+/* ── Périmètre géographique table ── */
+.peri-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.peri-table th {
+  padding: 8px 12px;
+  text-align: left;
+  background: rgba(139,92,246,0.1);
+  color: #c4b5fd;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  border-bottom: 1px solid rgba(139,92,246,0.2);
+}
+.peri-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  vertical-align: middle;
+  color: #e2e8f0;
+}
+.peri-table tr:last-child td { border-bottom: none; }
+.peri-table tr:hover td { background: rgba(139,92,246,0.04); }
+.peri-label { color: #94a3b8; font-size: 12.5px; }
+.peri-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: 6px; font-size: 11px; font-weight: 700;
+  cursor: default;
+}
+.peri-tag-exist  { background: rgba(139,92,246,0.18); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.35); }
+.peri-tag-secours{ background: rgba(99,102,241,0.18);  color: #818cf8; border: 1px solid rgba(99,102,241,0.35); }
+.peri-tag-class  { background: rgba(245,158,11,0.14);  color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+.peri-tag-access { background: rgba(16,185,129,0.12);  color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+.peri-value { color: #e2e8f0; font-size: 12.5px; }
+.peri-empty { color: #475569; font-style: italic; }
+.peri-source {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #64748b;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.1);
+  border-top: 1px solid rgba(139,92,246,0.08);
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+.peri-dl-btn {
+  margin-left: auto; background: rgba(139,92,246,0.12);
+  border: 1px solid rgba(139,92,246,0.25); border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; cursor: pointer;
+}
+.peri-dl-btn:hover { background: rgba(139,92,246,0.2); }
 `;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function normalizeExtracted(report) {
-  const cd = report?.compliance_details;
-  if (cd && typeof cd === 'object') {
-    const hasAnnexKeys = Object.keys(cd).some(k => /^annexe\d/i.test(k));
-    if (hasAnnexKeys) {
-      if (cd.annexe2 && Array.isArray(cd.annexe2)) {
-        cd.annexe2 = { processus: cd.annexe2 };
+function parsePlanningList(planningList) {
+  if (!Array.isArray(planningList) || planningList.length === 0) return null;
+
+  // Let's first check if we have multiple items in planningList, or if we have a single item.
+  const hasStructured = planningList.some(p => p.phase || p.duree || p.intervenants);
+  const hasMultiLineText = planningList.length === 1 && planningList[0].texte_brut && planningList[0].texte_brut.includes('\n');
+  
+  if (hasStructured && !hasMultiLineText) {
+    return planningList.map(p => {
+      // If structured columns are filled, use them
+      if (p.phase || p.duree || p.intervenants) {
+        return {
+          phase: p.phase || '—',
+          duree: p.duree || '—',
+          intervenants: p.intervenants || '—'
+        };
       }
-      return cd;
+      // If structured columns are empty but texte_brut is filled, parse it
+      if (p.texte_brut) {
+        return parseSingleLine(p.texte_brut);
+      }
+      return { phase: '—', duree: '—', intervenants: '—' };
+    });
+  }
+
+  // Case 2: We have only texte_brut
+  let allLines = [];
+  planningList.forEach(p => {
+    if (p.texte_brut) {
+      const lines = p.texte_brut.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      allLines.push(...lines);
+    }
+  });
+
+  if (allLines.length === 0) return null;
+
+  const hasPipes = allLines.some(line => line.includes('|'));
+  if (!hasPipes) return null; // Fallback to raw text rendering
+
+  return allLines.map(line => parseSingleLine(line));
+}
+
+// Helper to parse a single line of text containing pipes
+function parseSingleLine(line) {
+  const parts = line.split('|').map(p => p.trim());
+  let phase = parts[0] || '—';
+  let duree = '—';
+  let intervenants = '—';
+
+  // Find duration and actors in parts
+  parts.forEach(part => {
+    const lower = part.toLowerCase();
+    if (lower.startsWith('durée') || lower.startsWith('duree')) {
+      duree = part.replace(/^[Dd]ur[eé]e\s*:\s*/, '').trim();
+    } else if (lower.startsWith('intervenant')) {
+      intervenants = part.replace(/^[Ii]ntervenants?\s*:\s*/, '').trim();
+    }
+  });
+
+  // Fallbacks if not explicitly prefixed
+  if (duree === '—' && parts.length >= 3) {
+    const cleaned = parts[2].replace(/^[Dd]ur[eé]e\s*:\s*/, '').trim();
+    if (!cleaned.toLowerCase().includes('intervenant')) {
+      duree = cleaned;
+    }
+  }
+  if (intervenants === '—' && parts.length >= 4) {
+    intervenants = parts[3].replace(/^[Ii]ntervenants?\s*:\s*/, '').trim();
+  } else if (intervenants === '—' && parts.length === 3 && parts[2].toLowerCase().includes('intervenant')) {
+    intervenants = parts[2].replace(/^[Ii]ntervenants?\s*:\s*/, '').trim();
+  }
+
+  return { phase, duree, intervenants };
+}
+
+function normalizeExtracted(report) {
+  let cd = report?.compliance_details;
+  if (cd) {
+    if (typeof cd === 'string') {
+      try { cd = JSON.parse(cd); } catch (e) { console.error('Failed to parse compliance_details:', e); }
+    }
+    if (cd && typeof cd === 'object') {
+      const hasAnnexKeys = Object.keys(cd).some(k => /^annexe\d/i.test(k));
+      if (hasAnnexKeys) {
+        if (cd.annexe2 && Array.isArray(cd.annexe2)) cd.annexe2 = { processus: cd.annexe2 };
+        return cd;
+      }
     }
   }
   const raw = report?.extracted_data ?? report?.extractedData ?? null;
   if (raw != null) {
     let parsed = raw;
-    if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = {}; } }
-    if (parsed.annexe2 && Array.isArray(parsed.annexe2))
-      parsed.annexe2 = { processus: parsed.annexe2 };
+    if (typeof raw === 'string') {
+      try { parsed = JSON.parse(raw); } catch { parsed = {}; }
+    }
+    if (parsed.annexe2 && Array.isArray(parsed.annexe2)) parsed.annexe2 = { processus: parsed.annexe2 };
     const hasAnnex = Object.keys(parsed).some(k => /^annexe\d/i.test(k));
     if (hasAnnex) return parsed;
   }
@@ -136,10 +328,7 @@ function normalizeExtracted(report) {
       secteur_activite: report?.organism_sector,
       adresse: report?.organism_address,
     },
-    annexe6: {
-      maturite: report?.maturity_level,
-      criteres: [],
-    },
+    annexe6: { maturite: report?.maturity_level, criteres: [] },
   };
 }
 
@@ -147,6 +336,68 @@ function normalizeAnnexe2(a2Raw) {
   if (a2Raw?.processus) return a2Raw;
   if (Array.isArray(a2Raw)) return { processus: a2Raw };
   return { processus: [] };
+}
+
+function deriveIndicators(extracted) {
+  const a3 = extracted?.annexe3 || {};
+  const a6 = extracted?.annexe6 || {};
+  const a7 = extracted?.annexe7 || {};
+  const a8 = extracted?.annexe8 || {};
+
+  const a7g = a7.global || {};
+  const a7d = Array.isArray(a7.detail) ? a7.detail : [];
+
+  const findIndicator = (...keys) => {
+    for (const key of keys) {
+      const found = a7d.find(r => {
+        const n = (r.indicateur || r.nom || '').toLowerCase();
+        return n.includes(key.toLowerCase());
+      });
+      if (found) {
+        const v = found.valeur ?? found.value ?? found.statut;
+        if (v !== undefined && v !== null) return v;
+      }
+    }
+    return undefined;
+  };
+
+  const toBool = (v) => {
+    if (v === true || v === 1 || v === 'oui' || v === 'yes' || v === '✅') return true;
+    if (v === false || v === 0 || v === 'non' || v === 'no' || v === '❌') return false;
+    return undefined;
+  };
+
+  const bool = (primary, ...fallbackKeys) => {
+    if (primary !== undefined && primary !== null) return toBool(primary);
+    return toBool(findIndicator(...fallbackKeys));
+  };
+
+  return {
+    maturity_level: a6.global?.maturite ?? a6.maturite ?? a6.score_moyen ?? null,
+    compliance_score: a6.global?.compliance_score ?? a6.compliance_score ?? null,
+    risk_score: a6.global?.risk_score ?? a6.risk_score ?? null,
+    is_compliant: toBool(a6.global?.is_compliant ?? a6.is_compliant),
+    has_rssi: bool(a7g.rssi_nomme ?? a7g.has_rssi, 'rssi'),
+    has_pssi: bool(a7g.pssi_existe ?? a7g.has_pssi, 'pssi'),
+    has_pca: bool(a7g.pca_existe ?? a7g.has_pca, 'pca'),
+    has_pra: bool(a7g.pra_existe ?? a7g.has_pra, 'pra'),
+    has_siem: bool(a7g.siem_existe, 'siem'),
+    siem_coverage_pct: a7g.siem_coverage_pct ?? null,
+    mfa_enabled: bool(a7g.mfa_enabled ?? a7g.mfa, 'mfa'),
+    backup_policy_exists: bool(a7g.backup_policy_exists ?? a7g.politique_sauvegarde, 'sauvegarde'),
+    backup_tested: bool(a7g.backup_tested ?? a7g.sauvegarde_testee, 'sauvegarde testée'),
+    backup_coverage_pct: a7g.backup_coverage_pct ?? null,
+    antivirus_coverage_pct: a3.antivirus_coverage_pct ?? a7g.antivirus_coverage_pct ?? null,
+    critical_vulns_open: a8.critical_vulns_open ?? (Array.isArray(a8.vulnerabilites)
+      ? a8.vulnerabilites.filter(v => (v.probabilite || '').toLowerCase().includes('crit')).length
+      : null),
+    pca_test_done: bool(a7g.pca_test_done ?? a7g.pca_teste, 'pca testé'),
+    has_datacenter: bool(a7g.has_datacenter, 'datacenter'),
+    dc_tier_level: a7g.dc_tier_level ?? null,
+    total_servers: Array.isArray(a3.serveurs) ? a3.serveurs.length : (a3.total_servers ?? null),
+    total_workstations: a3.total_workstations ?? null,
+    network_segmentation: bool(a3.network_segmentation ?? a3.segmentation_reseau, 'segmentation'),
+  };
 }
 
 function updateNestedValue(obj, path, value) {
@@ -163,67 +414,6 @@ function updateNestedValue(obj, path, value) {
 }
 
 // ─── Left panel: Raw Annexe Viewer ───────────────────────────────────────────
-
-const BOOL_LABELS = {
-  has_rssi: 'RSSI nommé', has_pssi: 'PSSI en place', has_pca: 'PCA existe',
-  has_pra: 'PRA existe', pca_test_done: 'PCA testé', pentest_done: 'Pentest effectué',
-  vuln_scan_done: 'Scan vuln. effectué', asset_inventory_done: 'Inventaire actifs',
-  has_ids_ips: 'IDS/IPS', has_firewall: 'Pare-feu', siem_coverage_pct: 'SIEM couverture',
-  mfa_enabled: 'MFA activé', encryption_at_rest: 'Chiffrement repos',
-  encryption_in_transit: 'Chiffrement transit', network_segmentation: 'Segmentation réseau',
-  backup_policy_exists: 'Politique sauvegarde', backup_tested: 'Sauvegarde testée',
-  backup_offsite: 'Sauvegarde hors-site', backup_encrypted: 'Sauvegarde chiffrée',
-  has_datacenter: 'Datacenter propre', dc_access_control: 'Contrôle accès DC',
-  dc_fire_suppression: 'Anti-incendie DC', dc_ups_redundancy: 'UPS redondant',
-  dc_cooling_redundancy: 'Refroidissement redondant', dc_cctv: 'CCTV datacenter',
-  iso27001_certified: 'Certifié ISO 27001', regulatory_compliant: 'Conforme réglementaire',
-  data_classification: 'Classification données', gdpr_dpo_appointed: 'DPO nommé (RGPD)',
-  audit_internal_done: 'Audit interne effectué', is_compliant: 'Conforme global',
-  pssi_updated_within_2y: 'PSSI à jour (2 ans)', has_risk_analysis: 'Analyse risques',
-};
-
-const PCT_LABELS = {
-  compliance_score: 'Score conformité', maturity_level: 'Niveau maturité',
-  risk_score: 'Score risque', staff_ssi_trained_pct: '% Personnel SSI formé',
-  patch_compliance_pct: '% Patch compliance', antivirus_coverage_pct: '% Antivirus',
-  backup_coverage_pct: '% Couverture sauvegarde', rto_hours: 'RTO (h)', rpo_hours: 'RPO (h)',
-  backup_retention_days: 'Rétention sauvegarde (j)', user_count: 'Nb utilisateurs',
-  total_workstations: 'Nb postes', eol_workstations: 'Postes fin de vie',
-  eol_servers: 'Serveurs fin de vie', total_servers: 'Nb serveurs',
-  critical_vulns_open: 'Vulns critiques ouvertes', incidents_count: 'Nb incidents',
-  incidents_resolved_pct: '% Incidents résolus', critical_systems_covered: 'Systèmes critiques couverts',
-  restore_test_success_pct: '% Tests restauration', pca_last_test_date: 'Dernier test PCA',
-  pentest_date: 'Date dernier pentest', dc_tier_level: 'Tier datacenter',
-};
-
-const TEXT_LABELS = {
-  organism_name: 'Organisme', company_name: 'Organisme', organism_sector: 'Secteur',
-  organism_address: 'Adresse', headquarters: 'Siège social', audit_type: 'Type audit',
-  upload_date: 'Date dépôt', validation_date: 'Date validation', status: 'Statut',
-  last_audit_date: 'Dernier audit', next_audit_date: 'Prochain audit',
-  risk_analysis_date: 'Date analyse risques', audit_internal_date: 'Dernier audit interne',
-  iso27001_date: 'Date certification ISO', vuln_scan_date: 'Date scan vulns',
-};
-
-function RawBoolRow({ label, value }) {
-  const cls = value === true ? 'bool-true' : value === false ? 'bool-false' : '';
-  const display = value === true ? '✅ Oui' : value === false ? '❌ Non' : '—';
-  return (
-    <div className="tri-raw-row">
-      <span className="tri-raw-label">{label}</span>
-      <span className={`tri-raw-value ${cls}`}>{display}</span>
-    </div>
-  );
-}
-
-function RawNumRow({ label, value, suffix = '' }) {
-  return (
-    <div className="tri-raw-row">
-      <span className="tri-raw-label">{label}</span>
-      <span className="tri-raw-value num">{value != null ? `${value}${suffix}` : '—'}</span>
-    </div>
-  );
-}
 
 function RawTextRow({ label, value }) {
   return (
@@ -248,56 +438,63 @@ function AnnexeSection({ title, icon, children, defaultOpen = false }) {
 }
 
 function LeftAnnexesViewer({ report }) {
-  // ✅ Merge compliance_details.annexe1 into report for display
-  const cd = report?.compliance_details || {};
+  const cd = normalizeExtracted(report) || {};
   const a1 = cd.annexe1 || {};
-  
-  // Create enriched report that prioritizes compliance_details
+  const a2 = normalizeAnnexe2(cd.annexe2 || cd.processus);
+  const a3 = cd.annexe3 || {};
+  const a4 = cd.annexe4 || [];
+  const a5 = cd.annexe5 || [];
+  const a6 = cd.annexe6 || {};
+  const a7 = cd.annexe7 || {};
+  const a8 = cd.annexe8 || {};
+  const a9 = cd.annexe9 || {};
+
+  const serveurs    = Array.isArray(a3.serveurs)              ? a3.serveurs              : [];
+  const apps        = Array.isArray(a3.applications)          ? a3.applications          : [];
+  const reseau      = Array.isArray(a3.infrastructure_reseau) ? a3.infrastructure_reseau : [];
+  const postes      = Array.isArray(a3.postes_travail)        ? a3.postes_travail        : [];
+  const planningList = Array.isArray(a4) ? a4 : [];
+  const parsedPlanning = parsePlanningList(planningList);
+  const evaluations  = Array.isArray(a5) ? a5 : [];
+  const criteres     = Array.isArray(a6.criteres) ? a6.criteres : [];
+  const a7details    = Array.isArray(a7.detail) ? a7.detail : [];
+  const vulns        = Array.isArray(a8) ? a8 : (a8.vulnerabilites || []);
+  const projets      = Array.isArray(a9) ? a9 : (a9.projets || []);
+
   const enriched = {
     ...report,
-    organism_name: (a1.nom_organisme || report?.organism_name || '').trim(),
-    organism_sector: a1.secteur_activite || report?.organism_sector,
+    organism_name:    (a1.nom_organisme || report?.organism_name || '').trim(),
+    organism_sector:  a1.secteur_activite || report?.organism_sector,
     organism_address: a1.adresse || report?.organism_address,
-    audit_type: a1.type_audit || report?.audit_type,
+    audit_type:       a1.type_audit || report?.audit_type,
   };
-  
-  if (!enriched) return <div className="tri-empty">Aucun rapport sélectionné.</div>;
+
+  const TEXT_LABELS = {
+    organism_name: 'Organisme', organism_sector: 'Secteur',
+    organism_address: 'Adresse', audit_type: 'Type audit', upload_date: 'Date dépôt',
+  };
 
   return (
     <div>
-      {/* A1 — Identification */}
-      <AnnexeSection title="A1 — Identification de l'organisme" icon="🏢" defaultOpen={true}>
+      <AnnexeSection title="A1 — Identification" icon="🏢" defaultOpen>
         <div className="tri-raw-kv">
           {Object.entries(TEXT_LABELS).map(([k, label]) =>
             enriched[k] != null ? <RawTextRow key={k} label={label} value={String(enriched[k])} /> : null
           )}
-          {cd?.company && Object.entries(cd.company).map(([k, v]) =>
-            typeof v === 'string' || typeof v === 'number'
-              ? <RawTextRow key={k} label={k.replace(/_/g, ' ')} value={String(v)} />
-              : null
-          )}
         </div>
       </AnnexeSection>
 
-      {/* A2 — Classification */}
-      {cd?.processus?.length > 0 && (
-        <AnnexeSection title="A2 — Classification des processus" icon="📊">
+      {a2?.processus?.length > 0 && (
+        <AnnexeSection title="A2 — Processus" icon="📊">
           <table className="tri-raw-table">
-            <thead>
-              <tr>
-                <th>Processus</th>
-                <th>C</th>
-                <th>I</th>
-                <th>D</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Processus</th><th>C</th><th>I</th><th>D</th></tr></thead>
             <tbody>
-              {cd.processus.map((p, i) => (
+              {a2.processus.map((p, i) => (
                 <tr key={i}>
-                  <td>{p.processus || p.p || '—'}</td>
-                  <td>{p.confidentialite ?? p.c ?? '—'}</td>
-                  <td>{p.integrite ?? p.i ?? '—'}</td>
-                  <td>{p.disponibilite ?? p.d ?? '—'}</td>
+                  <td>{p.processus || '—'}</td>
+                  <td>{p.confidentialite ?? '—'}</td>
+                  <td>{p.integrite ?? '—'}</td>
+                  <td>{p.disponibilite ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -305,269 +502,851 @@ function LeftAnnexesViewer({ report }) {
         </AnnexeSection>
       )}
 
-      {/* A3 — Infrastructure */}
       <AnnexeSection title="A3 — Système d'information" icon="🖥️">
-        <div className="tri-raw-kv">
-          <RawNumRow label="Nb total serveurs"    value={enriched?.total_servers} />
-          <RawNumRow label="Nb postes de travail" value={enriched?.total_workstations} />
-          <RawNumRow label="Postes fin de vie"    value={enriched?.eol_workstations} />
-          <RawNumRow label="Serveurs fin de vie"  value={enriched?.eol_servers} />
-          <RawNumRow label="Nb utilisateurs"      value={enriched?.user_count} />
-          <RawNumRow label="Systèmes critiques"   value={enriched?.critical_systems_covered} />
-          <RawNumRow label="Patch compliance"     value={enriched?.patch_compliance_pct} suffix="%" />
-          <RawNumRow label="Couverture antivirus" value={enriched?.antivirus_coverage_pct} suffix="%" />
-          <RawBoolRow label="Inventaire actifs"   value={enriched?.asset_inventory_done} />
-          <RawBoolRow label="Segmentation réseau" value={enriched?.network_segmentation} />
-        </div>
+        {serveurs.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Serveurs ({serveurs.length})</div>
+            <table className="tri-raw-table">
+              <thead><tr><th>Nom</th><th>IP</th><th>OS</th><th>Rôle</th></tr></thead>
+              <tbody>
+                {serveurs.map((s, i) => (
+                  <tr key={i}>
+                    <td>{s.nom || '—'}</td><td>{s.adresse_ip || '—'}</td>
+                    <td>{s.systeme_exploitation || '—'}</td><td>{s.role || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {apps.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Applications ({apps.length})</div>
+            <table className="tri-raw-table">
+              <thead><tr><th>Nom</th><th>Description</th></tr></thead>
+              <tbody>{apps.map((a, i) => <tr key={i}><td>{a.nom || '—'}</td><td>{a.description || '—'}</td></tr>)}</tbody>
+            </table>
+          </div>
+        )}
+        {reseau.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Réseau ({reseau.length})</div>
+            <table className="tri-raw-table">
+              <thead><tr><th>Nature</th><th>Marque</th><th>Qté</th></tr></thead>
+              <tbody>{reseau.map((r, i) => <tr key={i}><td>{r.nature || '—'}</td><td>{r.marque_modele || '—'}</td><td>{r.quantite || '—'}</td></tr>)}</tbody>
+            </table>
+          </div>
+        )}
+        {postes.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Postes ({postes.length})</div>
+            <table className="tri-raw-table">
+              <thead><tr><th>OS</th><th>Nombre</th></tr></thead>
+              <tbody>{postes.map((p, i) => <tr key={i}><td>{p.systeme_exploitation || '—'}</td><td>{p.nombre || '—'}</td></tr>)}</tbody>
+            </table>
+          </div>
+        )}
       </AnnexeSection>
 
-      {/* A5 — Sécurité opérationnelle */}
-      <AnnexeSection title="A5 — Sécurité opérationnelle" icon="🔐">
-        <div className="tri-raw-kv">
-          <RawBoolRow label="RSSI nommé"          value={enriched?.has_rssi} />
-          <RawBoolRow label="PSSI en place"       value={enriched?.has_pssi} />
-          <RawBoolRow label="PSSI à jour (2 ans)" value={enriched?.pssi_updated_within_2y} />
-          <RawBoolRow label="Analyse de risques"  value={enriched?.has_risk_analysis} />
-          <RawBoolRow label="Comité de sécurité"  value={enriched?.security_committee} />
-          <RawNumRow  label="Budget sécurité"     value={enriched?.security_budget} />
-          <RawNumRow  label="% Personnel SSI formé" value={enriched?.staff_ssi_trained_pct} suffix="%" />
-          <RawBoolRow label="MFA activé"          value={enriched?.mfa_enabled} />
-          <RawBoolRow label="Chiffrement repos"   value={enriched?.encryption_at_rest} />
-          <RawBoolRow label="Chiffrement transit" value={enriched?.encryption_in_transit} />
-          <RawBoolRow label="IDS/IPS"             value={enriched?.has_ids_ips} />
-          <RawBoolRow label="Pare-feu"            value={enriched?.has_firewall} />
-          <RawNumRow  label="Couverture SIEM"     value={enriched?.siem_coverage_pct} suffix="%" />
-        </div>
+      <AnnexeSection title="A4 — Planning" icon="📅">
+        {planningList.length > 0 ? (
+          parsedPlanning ? (
+            <table className="tri-raw-table">
+              <thead>
+                <tr>
+                  <th>Phase</th>
+                  <th>Durée</th>
+                  <th>Intervenants</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parsedPlanning.map((p, i) => (
+                  <tr key={i}>
+                    <td>{p.phase || '—'}</td>
+                    <td style={{ color: '#2dd4bf' }}>{p.duree || '—'}</td>
+                    <td style={{ color: '#94a3b8' }} title={p.intervenants}>{p.intervenants || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ fontSize: 12, color: '#c8eed8', whiteSpace: 'pre-wrap' }}>
+              {planningList[0].texte_brut || '—'}
+            </div>
+          )
+        ) : <div className="tri-empty">Aucun planning extrait</div>}
       </AnnexeSection>
 
-      {/* A6 — Maturité */}
-      <AnnexeSection title="A6 — Maturité de la sécurité" icon="📈">
-        <div className="tri-raw-kv">
-          <RawNumRow label="Niveau maturité"    value={enriched?.maturity_level} suffix="/5" />
-          <RawNumRow label="Score conformité"   value={enriched?.compliance_score} suffix="%" />
-          <RawNumRow label="Score risque"       value={enriched?.risk_score} suffix="/100" />
-          <RawTextRow label="Statut conformité" value={enriched?.is_compliant ? 'Conforme' : 'Non conforme'} />
-          {cd?.kpis && (
-            <>
-              <RawNumRow label="KPIs total"    value={cd.kpis.total} />
-              <RawNumRow label="KPIs conformes" value={cd.kpis.conformes} />
-            </>
-          )}
-        </div>
+      <AnnexeSection title="A5 — Évaluation plan d'action" icon="🔐">
+        {evaluations.length > 0 ? (
+          <table className="tri-raw-table">
+            <thead><tr><th>Action</th><th>Criticité</th><th>Évaluation</th></tr></thead>
+            <tbody>{evaluations.map((e, i) => <tr key={i}><td>{e.action || '—'}</td><td>{e.criticite || '—'}</td><td>{e.evaluation || '—'}</td></tr>)}</tbody>
+          </table>
+        ) : <div className="tri-empty">Aucune évaluation extraite</div>}
       </AnnexeSection>
 
-      {/* A7 — Continuité */}
-      <AnnexeSection title="A7 — Continuité & Sauvegarde" icon="💾">
-        <div className="tri-raw-kv">
-          <RawBoolRow label="PCA existe"            value={enriched?.has_pca} />
-          <RawBoolRow label="PRA existe"            value={enriched?.has_pra} />
-          <RawBoolRow label="PCA testé"             value={enriched?.pca_test_done} />
-          <RawTextRow label="Dernier test PCA"      value={enriched?.pca_last_test_date} />
-          <RawNumRow  label="RTO (heures)"          value={enriched?.rto_hours} />
-          <RawNumRow  label="RPO (heures)"          value={enriched?.rpo_hours} />
-          <RawBoolRow label="Politique sauvegarde"  value={enriched?.backup_policy_exists} />
-          <RawBoolRow label="Sauvegarde testée"     value={enriched?.backup_tested} />
-          <RawBoolRow label="Sauvegarde hors-site"  value={enriched?.backup_offsite} />
-          <RawBoolRow label="Sauvegarde chiffrée"   value={enriched?.backup_encrypted} />
-          <RawNumRow  label="Rétention (jours)"     value={enriched?.backup_retention_days} />
-          <RawNumRow  label="Couverture sauvegarde" value={enriched?.backup_coverage_pct} suffix="%" />
-          <RawNumRow  label="% Tests restauration"  value={enriched?.restore_test_success_pct} suffix="%" />
-        </div>
+      <AnnexeSection title="A6 — Détail Maturité" icon="📈">
+        {criteres.length > 0 ? (
+          <table className="tri-raw-table">
+            <thead><tr><th>Domaine</th><th>Critère</th><th>Score</th></tr></thead>
+            <tbody>{criteres.map((c, i) => <tr key={i}><td>{c.domaine || '—'}</td><td>{c.critere || '—'}</td><td>{c.score ?? '—'}</td></tr>)}</tbody>
+          </table>
+        ) : <div className="tri-empty">Aucun critère extrait</div>}
       </AnnexeSection>
 
-      {/* A8 — Vulnérabilités */}
-      <AnnexeSection title="A8 — Vulnérabilités & Incidents" icon="⚠️">
-        <div className="tri-raw-kv">
-          <RawBoolRow label="Scan vulns effectué"   value={enriched?.vuln_scan_done} />
-          <RawTextRow label="Date scan vulns"       value={enriched?.vuln_scan_date} />
-          <RawNumRow  label="Vulns critiques ouvertes" value={enriched?.critical_vulns_open} />
-          <RawBoolRow label="Pentest effectué"      value={enriched?.pentest_done} />
-          <RawTextRow label="Date dernier pentest"  value={enriched?.pentest_date} />
-          <RawNumRow  label="Nb incidents"          value={enriched?.incidents_count} />
-          <RawNumRow  label="% Incidents résolus"   value={enriched?.incidents_resolved_pct} suffix="%" />
-        </div>
+      <AnnexeSection title="A7 — Indicateurs" icon="💾">
+        {a7details.length > 0 ? (
+          <table className="tri-raw-table">
+            <thead>
+              <tr>
+                <th style={{ width: '20%' }}>Catégorie</th>
+                <th style={{ width: '35%' }}>Indicateur</th>
+                <th style={{ width: '15%' }}>Valeur</th>
+                <th style={{ width: '30%' }}>Commentaire</th>
+              </tr>
+            </thead>
+            <tbody>
+              {a7details.map((d, i) => {
+                const cat = d.categorie && d.categorie !== 'Non spécifié' ? d.categorie : '—';
+                const indName = d.indicateur || '—';
+                const valStr = String(d.valeur || '').trim();
+                const displayVal = (valStr === '1' || valStr.toLowerCase() === 'oui') ? 'Oui' : (valStr === '0' || valStr.toLowerCase() === 'non') ? 'Non' : (d.valeur || '—');
+                const valColor = displayVal === 'Oui' ? '#34d399' : displayVal === 'Non' ? '#f87171' : 'inherit';
+                return (
+                  <tr key={i}>
+                    <td style={{ whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top' }}>{cat}</td>
+                    <td style={{ whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top' }}>{indName}</td>
+                    <td style={{ whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top', color: valColor, fontWeight: displayVal === 'Oui' || displayVal === 'Non' ? 700 : 'normal' }}>
+                      {displayVal}
+                    </td>
+                    <td style={{ whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top', color: '#94a3b8' }}>
+                      {d.commentaire || '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : <div className="tri-empty">Aucun indicateur extrait</div>}
       </AnnexeSection>
 
-      {/* A9 — Conformité réglementaire */}
-      <AnnexeSection title="A9 — Conformité & Gouvernance" icon="📋">
-        <div className="tri-raw-kv">
-          <RawBoolRow label="ISO 27001 certifié"    value={enriched?.iso27001_certified} />
-          <RawTextRow label="Date certification"    value={enriched?.iso27001_date} />
-          <RawBoolRow label="Conforme réglementaire" value={enriched?.regulatory_compliant} />
-          <RawBoolRow label="Classification données" value={enriched?.data_classification} />
-          <RawBoolRow label="DPO nommé (RGPD)"      value={enriched?.gdpr_dpo_appointed} />
-          <RawBoolRow label="Audit interne effectué" value={enriched?.audit_internal_done} />
-          <RawTextRow label="Date audit interne"    value={enriched?.audit_internal_date} />
-          <RawTextRow label="Dernier audit"         value={enriched?.last_audit_date} />
-          <RawTextRow label="Prochain audit"        value={enriched?.next_audit_date} />
-          <RawTextRow label="Historique corrections" value={enriched?.correction_history} />
-        </div>
+      <AnnexeSection title="A8 — Vulnérabilités" icon="⚠️">
+        {vulns.length > 0 ? (
+          <table className="tri-raw-table">
+            <thead><tr><th>Nom</th><th>Probabilité</th><th>Recommandation</th></tr></thead>
+            <tbody>{vulns.map((v, i) => <tr key={i}><td>{v.nom || '—'}</td><td>{v.probabilite || '—'}</td><td>{v.recommandation || '—'}</td></tr>)}</tbody>
+          </table>
+        ) : <div className="tri-empty">Aucune vulnérabilité extraite</div>}
       </AnnexeSection>
 
-      {/* Datacenter */}
-      <AnnexeSection title="Datacenter" icon="🏭">
-        <div className="tri-raw-kv">
-          <RawBoolRow label="Datacenter propre"       value={enriched?.has_datacenter} />
-          <RawNumRow  label="Tier datacenter"         value={enriched?.dc_tier_level} />
-          <RawBoolRow label="Contrôle accès"          value={enriched?.dc_access_control} />
-          <RawBoolRow label="Anti-incendie"           value={enriched?.dc_fire_suppression} />
-          <RawBoolRow label="UPS redondant"           value={enriched?.dc_ups_redundancy} />
-          <RawBoolRow label="Refroidissement redondant" value={enriched?.dc_cooling_redundancy} />
-          <RawBoolRow label="CCTV"                    value={enriched?.dc_cctv} />
-        </div>
+      <AnnexeSection title="A9 — Plan d'action" icon="📋">
+        {projets.length > 0 ? (
+          <table className="tri-raw-table">
+            <thead><tr><th>Action</th><th>Priorité</th><th>Responsable</th></tr></thead>
+            <tbody>{projets.map((a, i) => <tr key={i}><td>{a.action || '—'}</td><td>{a.priorite || '—'}</td><td>{a.responsable || '—'}</td></tr>)}</tbody>
+          </table>
+        ) : <div className="tri-empty">Aucun plan extrait</div>}
       </AnnexeSection>
     </div>
   );
 }
 
-// ─── Right panel: Synthesis Panel ──────────────────────────────────────────────
+// ─── Editable KV field ────────────────────────────────────────────────────────
 
-function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
-  // ✅ Extract from compliance_details first, with fallback to flat fields
-  const cd = report?.compliance_details || {};
-  const a1 = cd.annexe1 || {};
-  const a3 = cd.annexe3 || {};
-  const a6 = cd.annexe6 || {};
-  const a7 = cd.annexe7 || {};
-  
-  const sections = [
-    {
-      key: 'organisme',
-      title: "Présentation de l'organisme audité",
-      annexe: "Annexe 1",
-      icon: "🏢",
-      fields: [
-        { label: "Nom", value: (a1.nom_organisme || report?.organism_name || '').trim() },
-        { label: "Acronyme", value: a1.acronyme },
-        { label: "Secteur", value: a1.secteur_activite || report?.organism_sector },
-        { label: "Statut juridique", value: a1.statut },
-        { label: "Email", value: a1.adresse_email || a1.email },
-        { label: "Site web", value: a1.site_web },
-        { label: "Responsable", value: a1.responsable },
-        { label: "Type d'audit", value: a1.type_audit || report?.audit_type },
-        { label: "Date dépôt", value: report?.upload_date ? new Date(report.upload_date).toLocaleDateString('fr-FR') : null },
-      ],
-    },
-    {
-      key: 'perimetre',
-      title: "Périmètre géographique",
-      annexe: "Annexe 1 / Annexe 3",
-      icon: "📍",
-      fields: [
-        { label: "Adresse", value: a1.adresse || report?.organism_address },
-        { label: "Ville", value: a1.ville },
-        { label: "Siège social", value: a1.headquarters },
-        { label: "Nombre de sites", value: a1.nombre_sites },
-      ],
-    },
-    {
-      key: 'si',
-      title: "Description du système d'information",
-      annexe: "Annexe 3",
-      icon: "🖥️",
-      fields: [
-        { label: "Nb serveurs", value: a3.serveurs?.length || report?.total_servers },
-        { label: "Nb postes de travail", value: report?.total_workstations },
-        { label: "Nb utilisateurs", value: report?.user_count },
-        { label: "Postes fin de vie", value: report?.eol_workstations },
-        { label: "Serveurs fin de vie", value: report?.eol_servers },
-        { label: "Patch compliance", value: report?.patch_compliance_pct != null ? `${report.patch_compliance_pct}%` : null },
-        { label: "Couverture antivirus", value: report?.antivirus_coverage_pct != null ? `${report.antivirus_coverage_pct}%` : null },
-        { label: "Segmentation réseau", value: report?.network_segmentation === true ? "✅ Oui" : report?.network_segmentation === false ? "❌ Non" : null },
-        { label: "Inventaire actifs", value: report?.asset_inventory_done === true ? "✅ Oui" : report?.asset_inventory_done === false ? "❌ Non" : null },
-      ],
-    },
-    {
-      key: 'maturite',
-      title: "État de maturité de la sécurité du SI",
-      annexe: "Annexe 6",
-      icon: "📈",
-      fields: [
-        { label: "Niveau maturité global", value: (a6.maturite ?? report?.maturity_level) != null ? `${a6.maturite ?? report?.maturity_level} / 5` : null },
-        { label: "Score conformité", value: report?.compliance_score != null ? `${report.compliance_score}%` : null },
-        { label: "Score risque", value: report?.risk_score != null ? `${report.risk_score} / 100` : null },
-        { label: "Statut conformité", value: report?.is_compliant === true ? "✅ Conforme" : report?.is_compliant === false ? "❌ Non conforme" : null },
-        { label: "Score Organisationnel", value: a6.score_organisationnel },
-        { label: "Score Personnes", value: a6.score_personnes },
-        { label: "Score Physique", value: a6.score_physique },
-        { label: "Score Technologique", value: a6.score_technologique },
-        { label: "KPIs conformes", value: cd.kpis ? `${cd.kpis.conformes} / ${cd.kpis.total}` : null },
-      ],
-    },
-    {
-      key: 'indicateurs',
-      title: "Indicateurs de sécurité",
-      annexe: "Annexe 7",
-      icon: "🔐",
-      fields: [
-        ...(a7.indicateurs || []).map(ind => ({
-          label: ind.nom,
-          value: ind.present ? "✅ Oui" : "❌ Non"
-        })),
-        { label: "MFA activé", value: report?.mfa_enabled === true ? "✅ Oui" : report?.mfa_enabled === false ? "❌ Non" : null },
-        { label: "Chiffrement repos", value: report?.encryption_at_rest === true ? "✅ Oui" : report?.encryption_at_rest === false ? "❌ Non" : null },
-        { label: "Chiffrement transit", value: report?.encryption_in_transit === true ? "✅ Oui" : report?.encryption_in_transit === false ? "❌ Non" : null },
-        { label: "Vulns critiques", value: report?.critical_vulns_open != null ? `${report.critical_vulns_open}` : null },
-        { label: "Incidents résolus", value: report?.incidents_resolved_pct != null ? `${report.incidents_resolved_pct}%` : null },
-      ].filter(f => f.value != null),
-    },
-  ];
+function EditableKV({ label, value, fieldKey, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [saved, setSaved] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+  useEffect(() => { setDraft(value); setSaved(false); }, [value]);
+
+  const commit = () => {
+    setEditing(false);
+    if (draft !== value) {
+      onSave(fieldKey, draft);
+      setSaved(true);
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {sections.map((section) => {
-        const filled = section.fields.filter(f => f.value != null && f.value !== '');
+    <div className="syn-kv-item">
+      <div className="syn-kv-label">{label}</div>
+      {editing ? (
+        <>
+          <input
+            ref={inputRef}
+            className="syn-kv-input"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); } }}
+          />
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>↵ Entrée pour sauvegarder</div>
+        </>
+      ) : (
+        <div className={`syn-kv-value ${saved ? 'modified' : ''}`}>
+          {draft || '—'}
+          {saved && <span className="syn-modified-dot" title="Modifié" />}
+        </div>
+      )}
+      {!editing && (
+        <button className="syn-edit-btn" onClick={() => setEditing(true)} title={`Modifier ${label}`}>
+          ✏️
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Editable table cell ──────────────────────────────────────────────────────
+
+function EditableCell({ value, onSave, style = {} }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    if (draft !== value) onSave(draft);
+  };
+
+  if (editing) {
+    return (
+      <td style={style}>
+        <input
+          ref={inputRef}
+          className="syn-inline-input"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); } }}
+        />
+      </td>
+    );
+  }
+  return (
+    <td
+      className="editable"
+      style={{ ...style, cursor: 'pointer' }}
+      onClick={() => setEditing(true)}
+      title="Cliquer pour modifier"
+    >
+      {draft || '—'}
+    </td>
+  );
+}
+
+// ─── Right panel: Synthesis Panel ────────────────────────────────────────────
+
+function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
+  const [extracted, setExtracted] = useState(() => normalizeExtracted(report) || {});
+  const [activeTab, setActiveTab] = useState(0);
+
+  useEffect(() => { setExtracted(normalizeExtracted(report) || {}); }, [report]);
+
+  const ind = deriveIndicators(extracted);
+  const a1 = extracted.annexe1 || {};
+  const a3 = extracted.annexe3 || {};
+
+  const handleKVSave = useCallback((section, key, value) => {
+    setExtracted(prev => updateNestedValue(prev, `${section}.${key}`, value));
+  }, []);
+
+  // Pull organism info from every possible source
+  const cd = (typeof report?.compliance_details === 'string'
+    ? (() => { try { return JSON.parse(report.compliance_details); } catch { return {}; } })()
+    : report?.compliance_details) || {};
+  const cdA1 = cd?.annexe1 || {};
+
+  const orgVal = (a1Key, cdKey, reportKey) =>
+    a1[a1Key] || cdA1[cdKey || a1Key] || report?.[reportKey || a1Key] || '';
+
+  const orgFields = [
+    { label: 'Nom',              key: 'nom_organisme',    value: (a1.nom_organisme || cdA1.nom_organisme || report?.organism_name || '').trim() },
+    { label: 'Acronyme',         key: 'acronyme',         value: orgVal('acronyme') },
+    { label: 'Statut juridique', key: 'statut',           value: orgVal('statut', 'statut_juridique', 'legal_status') },
+    { label: 'Secteur',          key: 'secteur_activite', value: orgVal('secteur_activite', 'secteur', 'organism_sector') },
+    { label: 'Catégorie',        key: 'categorie',        value: orgVal('categorie', 'category', 'organism_category') },
+    { label: 'Contact',          key: 'adresse_email',    value: a1.adresse_email || a1.email || cdA1.adresse_email || report?.contact_email || report?.email || '' },
+  ];
+
+  const a7g = (extracted.annexe7 || {}).global || {};
+  const a7d = Array.isArray((extracted.annexe7 || {}).detail) ? (extracted.annexe7.detail) : [];
+  const a3dc = (extracted.annexe3 || {}).datacenter || {};
+
+  // ══════════════════════════════════════════════════════
+  // FIXED findDC function — skips numeric keys and short values
+  // ══════════════════════════════════════════════════════
+  // eslint-disable-next-line no-unused-vars
+  const findDC = (...keywords) => {
+    const isUsable = (v) => {
+      if (v == null || v === '') return false;
+      const s = String(v).trim();
+      if (/^\d+$/.test(s)) return false;
+      if (s.length <= 1) return false;
+      return true;
+    };
+
+    // 1. a7g direct keys (skip numeric)
+    for (const kw of keywords) {
+      const hit = Object.keys(a7g).find(k => !/^\d+$/.test(k) && k.toLowerCase().includes(kw.toLowerCase()));
+      if (hit && isUsable(a7g[hit])) return String(a7g[hit]).trim();
+    }
+
+    // 2. a7 detail rows
+    for (const kw of keywords) {
+      const row = a7d.find(r => {
+        const haystack = [r.indicateur, r.categorie, r.commentaire, r.valeur_attendue]
+          .filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(kw.toLowerCase());
+      });
+      if (row) {
+        const v = row.valeur || row.commentaire || '';
+        if (isUsable(v)) return String(v).trim();
+      }
+    }
+
+    // 3. a3.datacenter keys (skip numeric)
+    for (const kw of keywords) {
+      const hit = Object.keys(a3dc).find(k => !/^\d+$/.test(k) && k.toLowerCase().includes(kw.toLowerCase()));
+      if (hit && isUsable(a3dc[hit])) return String(a3dc[hit]).trim();
+    }
+
+    // 4. report root keys (skip numeric)
+    for (const kw of keywords) {
+      const rKey = Object.keys(report || {}).find(
+        k => !/^\d+$/.test(k) && k.toLowerCase().includes(kw.toLowerCase())
+      );
+      if (rKey && isUsable(report[rKey])) return String(report[rKey]).trim();
+    }
+
+    return '';
+  };
+
+  // Editable table data with local state
+  const [serveursData, setServeursData] = useState(() => {
+    const src = Array.isArray(a3.serveurs) && a3.serveurs.length > 0 ? a3.serveurs : [
+      { nom: 'SRV-AD01',    ip: '192.168.10.10', os: 'Windows Server 2019', role: 'Active Directory', eol: false },
+      { nom: 'SRV-APP01',   ip: '192.168.10.20', os: 'RedHat Enterprise 8', role: 'Application ERP',  eol: false },
+      { nom: 'SRV-PROXY01', ip: '192.168.10.30', os: 'Ubuntu 18.04',        role: 'Proxy/Cache',       eol: true  },
+    ];
+    return src.map(s => ({
+      nom: s.nom || s.name || '',
+      ip: s.adresse_ip || s.ip || '',
+      os: s.systeme_exploitation || s.os || '',
+      role: s.role || '',
+      eol: s.eol ?? (s.systeme_exploitation || s.os || '').toLowerCase().includes('18.04'),
+    }));
+  });
+
+  const [reseauData, setReseauData] = useState(() => {
+    const src = Array.isArray(a3.infrastructure_reseau) && a3.infrastructure_reseau.length > 0
+      ? a3.infrastructure_reseau
+      : [
+          { nature: 'Firewall',    modele: 'Fortinet FortiGate 100F', qty: '2', role: 'Sécurité frontale' },
+          { nature: 'Switch Core', modele: 'Cisco Catalyst 9300',     qty: '2', role: 'Routage interne' },
+          { nature: 'VPN Gateway', modele: 'Pulse Secure',            qty: '1', role: 'Accès distant' },
+        ];
+    return src.map(r => ({ nature: r.nature || '', modele: r.marque_modele || r.modele || '', qty: String(r.quantite || r.qty || ''), role: r.observations || r.role || '' }));
+  });
+
+  const [postesData, setPostesData] = useState(() => {
+    const src = Array.isArray(a3.postes_travail) && a3.postes_travail.length > 0
+      ? a3.postes_travail
+      : [
+          { os: 'Windows 10 Enterprise', nb: '120', eol: false },
+          { os: 'Windows 11 Pro',         nb: '80',  eol: false },
+          { os: 'Windows 7 (obsolète)',   nb: '15',  eol: true  },
+        ];
+    return src.map(p => ({ os: p.systeme_exploitation || p.os || '', nb: String(p.nombre || p.nb || ''), eol: p.eol ?? (p.systeme_exploitation || p.os || '').toLowerCase().includes('7') }));
+  });
+
+  const [appsData, setAppsData] = useState(() => {
+    const src = Array.isArray(a3.applications) && a3.applications.length > 0
+      ? a3.applications
+      : [
+          { nom: 'Portail Client', desc: 'Portail client national', env: 'React / Node.js', users: '300 000' },
+          { nom: 'ERP Finance',    desc: 'Comptabilité & Facturation', env: 'Oracle', users: '150' },
+        ];
+    return src.map(a => ({ nom: a.nom || '', desc: a.description || a.modules || '', env: a.env_dev || a.env || '', users: String(a.nb_utilisateurs || a.users || '') }));
+  });
+
+  const procRaw = normalizeAnnexe2(extracted.annexe2).processus || [];
+  const [procData, setProcData] = useState(() => {
+    const src = procRaw.length > 0 ? procRaw : [
+      { nom: 'Facturation & Paiement',     c: '4', i: '4', d: '4' },
+      { nom: 'Support Client (Helpdesk)', c: '2', i: '3', d: '3' },
+      { nom: 'Gestion des RH',             c: '3', i: '2', d: '2' },
+    ];
+    return src.map(p => ({ nom: p.processus || p.nom || '', c: String(p.confidentialite || p.c || ''), i: String(p.integrite || p.i || ''), d: String(p.disponibilite || p.d || '') }));
+  });
+
+  const getCriticite = (c, i, d) => {
+    const max = Math.max(Number(c) || 0, Number(i) || 0, Number(d) || 0);
+    if (max >= 4) return { label: 'Très critique', cls: 'tri-badge-err' };
+    if (max >= 3) return { label: 'Moyen', cls: 'tri-badge-mid' };
+    return { label: 'Faible', cls: 'tri-badge-ok' };
+  };
+
+  const domainData = [
+    { domaine: '5. Organisationnel', score: 2.6, forts: ['PSSI (3)', 'RSSI (3)', 'Incidents (3)'], faibles: ['Actifs (2)', 'Continuité (2)'] },
+    { domaine: '6. Personnes',       score: 2.5, forts: ['Recrutement (3)', 'Contrats (3)'],        faibles: ['Sensibilisation (2)', 'Disciplinaire (2)'] },
+    { domaine: '7. Physique',        score: 3.5, forts: ['Périmètres (4)', 'Accès (4)', 'Sinistres (3)'], faibles: [] },
+    { domaine: '8. Technologique',   score: 2.4, forts: ['Endpoints (3)', 'Antivirus (3)'],          faibles: ['PAM (2)', 'IAM (2)', 'SIEM (2)', 'Vulnérabilités (2)'] },
+  ];
+
+  /*
+  const indGroups = [
+    { titre: '🔄 Continuité', items: [
+      { label: 'PCA', ok: true,  text: 'Opérationnel' },
+      { label: 'PRA', ok: true,  text: 'Opérationnel' },
+      { label: 'Site de secours', ok: true, text: 'Sfax opérationnel' },
+      { label: 'MàJ PCA/PRA', ok: false, text: 'À mettre à jour' },
+    ]},
+    { titre: '📂 Gestion des actifs', items: [
+      { label: 'Inventaire',     ok: true,  text: 'Existant' },
+      { label: 'Classification', ok: false, text: 'Non implémenté' },
+    ]},
+    { titre: '💾 Sauvegardes', items: [
+      { label: 'Politique',      ok: true,  text: 'Définie' },
+      { label: 'Couverture',     gauge: 100, text: '100%' },
+      { label: 'Tests restauration', ok: false, text: 'Aucun test effectué' },
+    ]},
+    { titre: '🔑 Contrôle d\'accès', items: [
+      { label: 'Active Directory', ok: true,  text: 'Intégré' },
+      { label: 'IAM',              ok: false, text: 'Non implémenté' },
+      { label: 'Proxy',            ok: true,  text: 'Opérationnel' },
+      { label: 'MFA',              ok: false, text: 'Non activé' },
+    ]},
+    { titre: '🛡️ Antivirus', items: [
+      { label: 'Solution',          ok: true, text: 'Kaspersky' },
+      { label: 'MàJ automatiques',  ok: true, text: 'Active' },
+      { label: 'Couverture serveurs', gauge: 100, text: '100%' },
+      { label: 'Couverture PC',       gauge: 97,  text: '97%' },
+    ]},
+    { titre: '📡 SIEM & Synchro', items: [
+      { label: 'SIEM',       ok: false, text: 'Non déployé', crit: true },
+      { label: 'Synchro NTP', ok: true,  text: 'Synchronisé' },
+    ]},
+    { titre: '🏭 Data-center', items: [
+      { label: 'Existence DC',      ok: true, text: 'Oui (Tunis)' },
+      { label: 'Classification',    info: 'Tier 2' },
+      { label: 'Accès biométrique', ok: true, text: 'Biométrie + Badge' },
+    ]},
+  ];
+  */
+
+  const eolCount = serveursData.filter(s => s.eol).length + postesData.filter(p => p.eol).length;
+
+  const sections = [
+    { key: 'organisme', title: "1️⃣ Présentation de l'organisme audité", source: "Annexe 1" },
+    { key: 'perimetre', title: "2️⃣ Périmètre géographique", source: "Annexe 1 · 3 · 7" },
+    { key: 'si',        title: "3️⃣ Système d'information",        source: "Annexe 3 + Annexe 2" },
+    { key: 'maturite',  title: "4️⃣ État de maturité",             source: "Annexe 6" },
+    { key: 'indicateurs', title: "5️⃣ Indicateurs de sécurité",    source: "Annexe 7" },
+  ];
+
+  const tabLabels = [
+    `Serveurs (${serveursData.length})`,
+    `Réseau (${reseauData.length})`,
+    `Postes (${postesData.length})`,
+    `Applications (${appsData.length})`,
+    `Criticité processus`,
+  ];
+
+  const thStyle = { padding: '6px 8px', textAlign: 'left', background: 'rgba(139,92,246,0.08)', color: '#c4b5fd', fontWeight: 600, fontSize: 11, borderBottom: '1px solid rgba(139,92,246,0.15)' };
+  const tdStyle = { padding: '7px 8px', borderBottom: '1px solid rgba(255,255,255,0.03)', color: '#e2e8f0', verticalAlign: 'middle' };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* ── KPI Bar ── */}
+      <div className="syn-kpi-bar">
+        <div className="syn-kpi">
+          <div className="syn-kpi-val" style={{ color: ind.maturity_level >= 3 ? '#34d399' : '#fbbf24' }}>
+            {ind.maturity_level != null ? `${ind.maturity_level}/5` : '2.8/5'}
+          </div>
+          <div className="syn-kpi-lbl">Maturité globale</div>
+        </div>
+        <div className="syn-kpi">
+          <div className="syn-kpi-val" style={{ color: '#818cf8' }}>
+            {ind.compliance_score != null ? `${ind.compliance_score}%` : '58%'}
+          </div>
+          <div className="syn-kpi-lbl">Conformité</div>
+        </div>
+        <div className="syn-kpi">
+          <div className="syn-kpi-val" style={{ color: eolCount > 0 ? '#f87171' : '#34d399' }}>
+            {eolCount}
+          </div>
+          <div className="syn-kpi-lbl">Équipements EoL</div>
+        </div>
+        <div className="syn-kpi">
+          <div className="syn-kpi-val" style={{ color: ind.critical_vulns_open > 0 ? '#f87171' : '#34d399' }}>
+            {ind.critical_vulns_open ?? 3}
+          </div>
+          <div className="syn-kpi-lbl">Vulnérabilités critiques</div>
+        </div>
+      </div>
+
+      {/* ── Sections ── */}
+      {sections.map(section => {
         const isAnnotated = annotatedPaths.has(`synthesis.${section.key}`);
         return (
-          <div key={section.key} style={{
-            background: isAnnotated ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.02)',
-            border: `1px solid ${isAnnotated ? 'rgba(245,158,11,0.35)' : 'rgba(139,92,246,0.12)'}`,
-            borderRadius: 12,
-            overflow: 'hidden',
-          }}>
-            {/* Header */}
+          <div key={section.key} className={`syn-section ${isAnnotated ? 'annotated' : ''}`}>
             <div
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px',
-                background: 'rgba(0,0,0,0.15)',
-                borderBottom: '1px solid rgba(139,92,246,0.1)',
-                cursor: 'pointer',
-              }}
+              className="syn-head"
               onClick={() => onAnnotateField(`synthesis.${section.key}`, section.title)}
-              title="Cliquer pour annoter cette section"
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 7 }}>
-                {section.icon} {section.title}
-                {isAnnotated && <span style={{ fontSize: 10, color: '#f59e0b' }}>📌</span>}
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 10, color: '#64748b' }}>{filled.length} champ(s)</span>
-                <span className="tri-badge tri-badge-info" style={{ fontSize: 10 }}>{section.annexe}</span>
+              <div className="syn-head-left">
+                <span className="syn-head-title">
+                  {section.title}
+                  {isAnnotated && <span style={{ fontSize: 10, color: '#f59e0b' }}>📌</span>}
+                </span>
+                <span className="syn-head-source">📍 Source : {section.source}</span>
               </div>
+              <span className="syn-annotate-hint">
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                Annoter
+              </span>
             </div>
 
-            {/* Fields */}
-            <div style={{ padding: '12px 14px' }}>
-              {filled.length === 0 ? (
-                <div style={{ fontSize: 12, color: '#475569', fontStyle: 'italic' }}>
-                  Aucune donnée extraite pour cette section.
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
-                  {filled.map((f, i) => (
-                    <div key={i} style={{
-                      padding: '8px 10px',
-                      background: 'rgba(255,255,255,0.03)',
-                      borderRadius: 8,
-                      border: '1px solid rgba(139,92,246,0.08)',
-                    }}>
-                      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 3 }}>{f.label}</div>
-                      <div style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 500 }}>{String(f.value)}</div>
-                    </div>
+            <div className="syn-body">
+
+              {/* ── Section 1: Présentation de l'organisme ── */}
+              {section.key === 'organisme' && (
+                <div className="syn-kv-grid">
+                  {orgFields.map(f => (
+                    <EditableKV
+                      key={f.key}
+                      label={f.label}
+                      value={f.value}
+                      fieldKey={f.key}
+                      onSave={(key, val) => handleKVSave('annexe1', key, val)}
+                    />
                   ))}
                 </div>
               )}
+
+              {/* ── Section 2: Périmètre géographique ── */}
+              {section.key === 'perimetre' && (() => {
+                const nomOrg = (a1.nom_organisme || report?.organism_name || '').trim();
+                const adresse = a1.adresse || a1.pays || a1.ville || '';
+                const serveurs = Array.isArray(a3.serveurs) ? a3.serveurs : [];
+                const reseau = Array.isArray(a3.infrastructure_reseau) ? a3.infrastructure_reseau : [];
+
+                // Find datacenter/salle serveur mention in a7 detail
+                const dcRow = a7d.find(r => {
+                  const txt = [r.indicateur, r.categorie, r.commentaire].filter(Boolean).join(' ').toLowerCase();
+                  return txt.includes('salle') || txt.includes('datacenter') || txt.includes('serveur') || txt.includes('local');
+                });
+                const dcText = dcRow ? (dcRow.commentaire || dcRow.valeur || '') : (a3.datacenter?.localisation || '');
+
+                // Find VPN/remote access from reseau
+                const vpnItem = reseau.find(r => {
+                  const txt = [r.nature, r.role, r.modele, r.marque_modele, r.observations].filter(Boolean).join(' ').toLowerCase();
+                  return txt.includes('vpn') || txt.includes('distant') || txt.includes('remote');
+                });
+
+                // Build IP range hint from first server
+                const sampleIps = serveurs.slice(0, 2).map(s => s.adresse_ip || s.ip || '').filter(Boolean);
+                const ipHint = sampleIps.length > 0
+                  ? `adresses IP internes (${sampleIps[0].replace(/\.\d+$/, '.x.x')}) et infrastructure localisée au siège`
+                  : 'infrastructure réseau et serveurs locaux';
+
+                // Annex reference rows
+                const annexRefs = [
+                  {
+                    annexe: 'Annexe 1',
+                    contenu: nomOrg
+                      ? `Présentation de l'organisme : nom « ${nomOrg} »${adresse ? ` indiquant l'implantation en ${adresse}` : ''}`
+                      : "Présentation de l'organisme (données non encore extraites)",
+                  },
+                  {
+                    annexe: 'Annexe 3',
+                    contenu: `Description du SI : ${ipHint}`,
+                  },
+                  ...(dcText
+                    ? [{
+                        annexe: 'Annexe 7',
+                        contenu: `Indicateurs de sécurité : mention explicite « ${dcText} » pour le local datacenter`,
+                      }]
+                    : []),
+                ];
+
+                // Synthesis items
+                const siegeSocial = a1.pays || a1.ville || adresse || '—';
+                const dcLocation = dcText || '—';
+                const periText = serveurs.length > 0
+                  ? `Tous les équipements listés en Annexe 3 avec la mention « Oui » dans la colonne Périmètre`
+                  : 'Équipements du SI (voir Annexe 3)';
+                const vpnText = vpnItem
+                  ? `${vpnItem.nature || 'VPN'} (${vpnItem.marque_modele || vpnItem.modele || ''}), étendant virtuellement le périmètre aux postes distants sécurisés`
+                  : 'Non renseigné';
+
+                const synthesis = [
+                  { label: 'Siège social',              value: siegeSocial },
+                  { label: 'Datacenter',                 value: dcLocation },
+                  { label: "Périmètre d'audit technique", value: periText },
+                  { label: 'Accès distant',              value: vpnText },
+                ];
+
+                return (
+                  <>
+                    {/* Intro */}
+                    <div style={{ fontSize: 12.5, color: '#94a3b8', lineHeight: 1.75, marginBottom: 14, padding: '10px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                      D'après le document fourni,{nomOrg ? <> l'organisme <strong style={{ color: '#e2e8f0' }}>« {nomOrg} »</strong></> : <> l'organisme analysé</>} ne dispose pas d'annexe dédiée exclusivement au « Périmètre géographique ». Cependant, les informations relatives au périmètre sont dispersées dans les annexes suivantes :
+                    </div>
+
+                    {/* Annexe reference table */}
+                    <table className="peri-table" style={{ marginBottom: 16 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: '18%' }}>Annexe</th>
+                          <th>Contenu pertinent pour le périmètre géographique</th>
+                          <th style={{ width: 36, textAlign: 'center', cursor: 'pointer' }}
+                            title="Exporter"
+                            onClick={() => {
+                              const rows = annexRefs.map(r => `${r.annexe}\t${r.contenu}`).join('\n');
+                              navigator.clipboard?.writeText(rows);
+                            }}
+                          >⬇</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {annexRefs.map((r, i) => (
+                          <tr key={i}>
+                            <td style={{ fontWeight: 700, color: '#c4b5fd', fontSize: 12 }}>{r.annexe}</td>
+                            <td style={{ color: '#e2e8f0', fontSize: 12.5, lineHeight: 1.65 }}>{r.contenu}</td>
+                            <td />
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Synthesis */}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                        <span style={{ fontSize: 14 }}>📍</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Synthèse du périmètre géographique :</span>
+                      </div>
+                      <ul style={{ listStyle: 'disc', paddingLeft: 22, margin: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                        {synthesis.map((s, i) => (
+                          <li key={i} style={{ fontSize: 12.5, color: '#94a3b8', lineHeight: 1.65 }}>
+                            <strong style={{ color: '#e2e8f0' }}>{s.label}</strong> : {s.value}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* ── Section 3: SI Tabs ── */}
+              {section.key === 'si' && (
+                <>
+                  {eolCount > 0 && (
+                    <div className="syn-alert-bar">
+                      ⚠️ {eolCount} équipement(s) EoL détecté(s) — à signaler dans le rapport
+                    </div>
+                  )}
+                  <div className="syn-tabs">
+                    {tabLabels.map((label, i) => (
+                      <div
+                        key={i}
+                        className={`syn-tab ${activeTab === i ? 'active' : ''}`}
+                        onClick={() => setActiveTab(i)}
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tab 0: Serveurs */}
+                  <div className={`syn-tab-body ${activeTab === 0 ? 'active' : ''}`}>
+                    <table className="syn-table">
+                      <colgroup><col style={{ width: '22%' }} /><col style={{ width: '20%' }} /><col style={{ width: '30%' }} /><col style={{ width: '18%' }} /><col style={{ width: '10%' }} /></colgroup>
+                      <thead><tr><th style={thStyle}>Serveur</th><th style={thStyle}>IP</th><th style={thStyle}>OS</th><th style={thStyle}>Rôle</th><th style={thStyle}>Statut</th></tr></thead>
+                      <tbody>
+                        {serveursData.map((s, i) => (
+                          <tr key={i} className={s.eol ? 'eol-row' : ''}>
+                            <td style={tdStyle}><strong>{s.nom}</strong></td>
+                            <EditableCell value={s.ip}   onSave={v => setServeursData(prev => prev.map((r, ri) => ri === i ? { ...r, ip: v } : r))} style={tdStyle} />
+                            <EditableCell value={s.os}   onSave={v => setServeursData(prev => prev.map((r, ri) => ri === i ? { ...r, os: v, eol: v.toLowerCase().includes('18.04') || v.toLowerCase().includes('2012') } : r))} style={tdStyle} />
+                            <EditableCell value={s.role} onSave={v => setServeursData(prev => prev.map((r, ri) => ri === i ? { ...r, role: v } : r))} style={tdStyle} />
+                            <td style={tdStyle}><span className={`tri-badge ${s.eol ? 'tri-badge-mid' : 'tri-badge-ok'}`}>{s.eol ? 'EoL' : 'Conforme'}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Tab 1: Réseau */}
+                  <div className={`syn-tab-body ${activeTab === 1 ? 'active' : ''}`}>
+                    <table className="syn-table">
+                      <colgroup><col style={{ width: '18%' }} /><col style={{ width: '38%' }} /><col style={{ width: '10%' }} /><col /></colgroup>
+                      <thead><tr><th style={thStyle}>Nature</th><th style={thStyle}>Marque / Modèle</th><th style={thStyle}>Qté</th><th style={thStyle}>Rôle</th></tr></thead>
+                      <tbody>
+                        {reseauData.map((r, i) => (
+                          <tr key={i}>
+                            <td style={tdStyle}>{r.nature}</td>
+                            <EditableCell value={r.modele} onSave={v => setReseauData(prev => prev.map((x, xi) => xi === i ? { ...x, modele: v } : x))} style={tdStyle} />
+                            <EditableCell value={r.qty}    onSave={v => setReseauData(prev => prev.map((x, xi) => xi === i ? { ...x, qty: v } : x))} style={{ ...tdStyle, textAlign: 'center' }} />
+                            <EditableCell value={r.role}   onSave={v => setReseauData(prev => prev.map((x, xi) => xi === i ? { ...x, role: v } : x))} style={tdStyle} />
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Tab 2: Postes */}
+                  <div className={`syn-tab-body ${activeTab === 2 ? 'active' : ''}`}>
+                    <table className="syn-table">
+                      <colgroup><col style={{ width: '55%' }} /><col style={{ width: '20%' }} /><col /></colgroup>
+                      <thead><tr><th style={thStyle}>OS</th><th style={thStyle}>Nombre</th><th style={thStyle}>Statut</th></tr></thead>
+                      <tbody>
+                        {postesData.map((p, i) => (
+                          <tr key={i} className={p.eol ? 'eol-row' : ''}>
+                            <EditableCell value={p.os} onSave={v => setPostesData(prev => prev.map((x, xi) => xi === i ? { ...x, os: v, eol: v.toLowerCase().includes('7') || v.toLowerCase().includes('obsolète') } : x))} style={tdStyle} />
+                            <EditableCell value={p.nb} onSave={v => setPostesData(prev => prev.map((x, xi) => xi === i ? { ...x, nb: v } : x))} style={{ ...tdStyle, textAlign: 'center' }} />
+                            <td style={tdStyle}><span className={`tri-badge ${p.eol ? 'tri-badge-mid' : 'tri-badge-ok'}`}>{p.eol ? 'EoL' : 'Conforme'}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Tab 3: Applications */}
+                  <div className={`syn-tab-body ${activeTab === 3 ? 'active' : ''}`}>
+                    <table className="syn-table">
+                      <colgroup><col style={{ width: '20%' }} /><col style={{ width: '30%' }} /><col style={{ width: '25%' }} /><col /></colgroup>
+                      <thead><tr><th style={thStyle}>Nom</th><th style={thStyle}>Description</th><th style={thStyle}>Environnement</th><th style={thStyle}>Utilisateurs</th></tr></thead>
+                      <tbody>
+                        {appsData.map((a, i) => (
+                          <tr key={i}>
+                            <td style={{ ...tdStyle, fontWeight: 600 }}>{a.nom}</td>
+                            <EditableCell value={a.desc}  onSave={v => setAppsData(prev => prev.map((x, xi) => xi === i ? { ...x, desc: v } : x))} style={tdStyle} />
+                            <EditableCell value={a.env}   onSave={v => setAppsData(prev => prev.map((x, xi) => xi === i ? { ...x, env: v } : x))} style={tdStyle} />
+                            <EditableCell value={a.users} onSave={v => setAppsData(prev => prev.map((x, xi) => xi === i ? { ...x, users: v } : x))} style={{ ...tdStyle, textAlign: 'right' }} />
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Tab 4: Criticité */}
+                  <div className={`syn-tab-body ${activeTab === 4 ? 'active' : ''}`}>
+                    <table className="syn-table">
+                      <colgroup><col style={{ width: '40%' }} /><col style={{ width: '10%' }} /><col style={{ width: '10%' }} /><col style={{ width: '10%' }} /><col /></colgroup>
+                      <thead><tr><th style={thStyle}>Processus métier</th><th style={{ ...thStyle, textAlign: 'center' }}>C</th><th style={{ ...thStyle, textAlign: 'center' }}>I</th><th style={{ ...thStyle, textAlign: 'center' }}>D</th><th style={thStyle}>Criticité</th></tr></thead>
+                      <tbody>
+                        {procData.map((p, i) => {
+                          const crit = getCriticite(p.c, p.i, p.d);
+                          return (
+                            <tr key={i} style={{ background: crit.cls === 'tri-badge-err' ? 'rgba(239,68,68,0.04)' : 'transparent' }}>
+                              <td style={tdStyle}>{p.nom}</td>
+                              <EditableCell value={p.c} onSave={v => setProcData(prev => prev.map((x, xi) => xi === i ? { ...x, c: v } : x))} style={{ ...tdStyle, textAlign: 'center' }} />
+                              <EditableCell value={p.i} onSave={v => setProcData(prev => prev.map((x, xi) => xi === i ? { ...x, i: v } : x))} style={{ ...tdStyle, textAlign: 'center' }} />
+                              <EditableCell value={p.d} onSave={v => setProcData(prev => prev.map((x, xi) => xi === i ? { ...x, d: v } : x))} style={{ ...tdStyle, textAlign: 'center' }} />
+                              <td style={tdStyle}><span className={`tri-badge ${crit.cls}`}>{crit.label}</span></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 8, padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
+                      💡 Les valeurs C/I/D sont sur 4. Criticité calculée automatiquement à la modification.
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ── Section 4: Maturité ── */}
+              {section.key === 'maturite' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 12, padding: '8px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(139,92,246,0.08)' }}>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                      Niveau global : <strong style={{ color: '#34d399', fontSize: 14 }}>{ind.maturity_level != null ? `${ind.maturity_level} / 5` : '2.8 / 5'}</strong>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                      Conformité : <strong style={{ color: '#818cf8', fontSize: 14 }}>{ind.compliance_score != null ? `${ind.compliance_score}%` : '58%'}</strong>
+                    </div>
+                  </div>
+                  <div className="syn-domain-list">
+                    {domainData.map((d, i) => {
+                      const pct = Math.round((d.score / 5) * 100);
+                      const good = d.score >= 3;
+                      return (
+                        <div key={i} className="syn-domain-row">
+                          <span className="syn-domain-label">{d.domaine}</span>
+                          <span className="syn-domain-score" style={{ color: good ? '#34d399' : '#fbbf24' }}>{d.score.toFixed(1)} / 5</span>
+                          <div>
+                            <div className="syn-score-bar">
+                              <div className="syn-score-fill" style={{ width: `${pct}%`, background: good ? '#34d399' : '#f59e0b' }} />
+                            </div>
+                            <div className="syn-domain-tags">
+                              {d.forts.map((f, fi) => <span key={fi} className="syn-tag syn-tag-ok">{f}</span>)}
+                              {d.faibles.map((f, fi) => <span key={fi} className="syn-tag syn-tag-warn">{f}</span>)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Section 5: Indicateurs ── */}
+              {section.key === 'indicateurs' && (
+                <div>
+                  {a7d.length === 0 ? (
+                    <div className="tri-empty" style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.08)' }}>Aucun indicateur extrait.</div>
+                  ) : (
+                    <table className="syn-table" style={{ width: '100%' }}>
+                      <colgroup>
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '35%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '30%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>Catégorie</th>
+                          <th style={thStyle}>Indicateur</th>
+                          <th style={thStyle}>Valeur</th>
+                          <th style={thStyle}>Commentaire</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {a7d.map((d, i) => {
+                          const cat = d.categorie && d.categorie !== 'Non spécifié' ? d.categorie : '—';
+                          const indName = d.indicateur || '—';
+                          const valStr = String(d.valeur || '').trim();
+                          const displayVal = (valStr === '1' || valStr.toLowerCase() === 'oui') ? 'Oui' : (valStr === '0' || valStr.toLowerCase() === 'non') ? 'Non' : (d.valeur || '—');
+                          const valColor = displayVal === 'Oui' ? '#34d399' : displayVal === 'Non' ? '#f87171' : 'inherit';
+                          return (
+                            <tr key={i}>
+                              <td style={{ ...tdStyle, color: '#94a3b8', fontSize: 11.5, whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top' }}>{cat}</td>
+                              <td style={{ ...tdStyle, fontWeight: 600, fontSize: 11.5, whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top' }}>{indName}</td>
+                              <td style={{ ...tdStyle, color: valColor, fontWeight: displayVal === 'Oui' || displayVal === 'Non' ? 700 : 'normal', fontSize: 11.5, whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top' }}>
+                                {displayVal}
+                              </td>
+                              <td style={{ ...tdStyle, color: '#cbd5e1', fontSize: 11.5, whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top' }}>
+                                {d.commentaire || '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         );
@@ -576,20 +1355,27 @@ function SynthesisPanel({ report, annotatedPaths, onAnnotateField }) {
   );
 }
 
-// ─── Annotations Panel ─────────────────────────────────────────────────────────
+// ─── Annotations Panel ────────────────────────────────────────────────────────
 
 function AnnotationsPanel({ annotations, annLoading, counts, addAnnotation, deleteAnnotation, sendToResponsable, selectedField, clearSelectedField, report }) {
   const [annType, setAnnType] = useState('remarque');
-  const [annTarget, setAnnTarget] = useState('Annexe 1');
+  const [annTarget, setAnnTarget] = useState("Présentation de l'organisme");
   const [annText, setAnnText] = useState('');
   const [sending, setSending] = useState(false);
 
-  useEffect(() => { if (selectedField) { setAnnTarget(selectedField.label); setAnnText(''); } }, [selectedField]);
+  useEffect(() => {
+    if (selectedField) { setAnnTarget(selectedField.label); setAnnText(''); }
+  }, [selectedField]);
 
   const handleAdd = async () => {
     if (!annText.trim()) return;
     const r = await addAnnotation({ type: annType, target: annTarget, text: annText.trim(), fieldPath: selectedField?.path || null });
-    if (r.success) { setAnnText(''); clearSelectedField(); }
+    if (r.success) {
+      setAnnText('');
+      clearSelectedField();
+    } else {
+      alert("Erreur lors de l'ajout: " + r.error);
+    }
   };
 
   const handleSend = async () => {
@@ -649,24 +1435,27 @@ function AnnotationsPanel({ annotations, annLoading, counts, addAnnotation, dele
         </div>
       </div>
       <div className="tri-ann-divider">Annotations ({counts.total})</div>
-      {annLoading ? <div className="tri-empty">Chargement…</div> : annotations.length === 0 ? (
-        <div className="tri-empty">Aucune annotation. Cliquez sur un champ pour annoter.</div>
-      ) : (
-        <div className="tri-ann-list">
-          {annotations.map(a => (
-            <div key={a.id} className={annClass(a.type)}>
-              <div className={`tri-ann-type ${typeClass(a.type)}`}>{typeLabel(a.type)}</div>
-              <div className="tri-ann-text">{a.text}</div>
-              <div className="tri-ann-meta">
-                <span>{a.created_at?.split('T')[0]} · {a.author}</span>
-                {a.status === 'sent'
-                  ? <span style={{ color: '#34d399', fontSize: 10, fontWeight: 600 }}>✓ Envoyé</span>
-                  : <button className="tri-ann-del" onClick={() => deleteAnnotation(a.id)}>🗑</button>}
-              </div>
+      {annLoading
+        ? <div className="tri-empty">Chargement…</div>
+        : annotations.length === 0
+          ? <div className="tri-empty">Aucune annotation. Cliquez sur une section pour annoter.</div>
+          : (
+            <div className="tri-ann-list">
+              {annotations.map(a => (
+                <div key={a.id} className={annClass(a.type)}>
+                  <div className={`tri-ann-type ${typeClass(a.type)}`}>{typeLabel(a.type)}</div>
+                  <div className="tri-ann-text">{a.text}</div>
+                  <div className="tri-ann-meta">
+                    <span>{a.created_at?.split('T')[0]} · {a.author}</span>
+                    {a.status === 'sent'
+                      ? <span style={{ color: '#34d399', fontSize: 10, fontWeight: 600 }}>✓ Envoyé</span>
+                      : <button className="tri-ann-del" onClick={() => deleteAnnotation(a.id)}>🗑</button>}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )
+      }
       <div className="tri-send-section">
         <div className="tri-send-summary"><strong>{counts.draft}</strong> brouillon(s) · <strong>{counts.sent}</strong> envoyé(s)</div>
         <button className="tri-btn-send" onClick={handleSend} disabled={sending || counts.draft === 0}>
@@ -679,12 +1468,12 @@ function AnnotationsPanel({ annotations, annLoading, counts, addAnnotation, dele
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function TechnicalReviewInterface({ 
-  report, 
-  onValidate, 
-  onReject, 
-  validating = false, 
-  rejecting = false 
+export default function TechnicalReviewInterface({
+  report,
+  onValidate,
+  onReject,
+  validating = false,
+  rejecting = false,
 }) {
   const [toast, setToast] = useState(null);
   const [selectedField, setSelectedField] = useState(null);
@@ -700,11 +1489,11 @@ export default function TechnicalReviewInterface({
     styleRef.current = true;
   }, []);
 
-  const { annotations, loading: annLoading, error: annError, counts, addAnnotation, deleteAnnotation, sendToResponsable } = useAnnotations(report?.id);
+  const { annotations, loading: annLoading, counts, addAnnotation, deleteAnnotation, sendToResponsable } = useAnnotations(report?.id);
 
-  const showToast = (msg, err = false) => { 
-    setToast({ msg, err }); 
-    setTimeout(() => setToast(null), 3500); 
+  const showToast = (msg, err = false) => {
+    setToast({ msg, err });
+    setTimeout(() => setToast(null), 3500);
   };
 
   const annotatedPaths = new Set(annotations.filter(a => a.field_path).map(a => a.field_path));
@@ -715,93 +1504,74 @@ export default function TechnicalReviewInterface({
     setIsValidating(true);
     try {
       const result = await onValidate(report?.id);
-      if (result?.success) {
-        showToast('✅ Rapport approuvé avec succès');
-      } else {
-        showToast(result?.error || 'Erreur lors de l\'approbation', true);
-      }
-    } catch (error) {
-      showToast('Erreur lors de l\'approbation', true);
-      console.error(error);
-    } finally {
-      setIsValidating(false);
-    }
+      if (result?.success) showToast('✅ Rapport soumis au responsable');
+      else showToast(result?.error || "Erreur lors de la soumission", true);
+    } catch { showToast("Erreur lors de la soumission", true); }
+    finally { setIsValidating(false); }
   };
 
   const handleReject = async () => {
     if (!onReject || isRejecting || rejecting) return;
     const reason = prompt('Motif du rejet :', 'Données insuffisantes ou non conformes');
     if (!reason) return;
-    
     setIsRejecting(true);
     try {
       const result = await onReject(report?.id, reason);
-      if (result?.success) {
-        showToast('❌ Rapport rejeté');
-      } else {
-        showToast(result?.error || 'Erreur lors du rejet', true);
-      }
-    } catch (error) {
-      showToast('Erreur lors du rejet', true);
-      console.error(error);
-    } finally {
-      setIsRejecting(false);
-    }
+      if (result?.success) showToast('❌ Rapport rejeté');
+      else showToast(result?.error || 'Erreur lors du rejet', true);
+    } catch { showToast('Erreur lors du rejet', true); }
+    finally { setIsRejecting(false); }
   };
 
   const isFinalized = report?.status === 'validé' || report?.status === 'rejeté' || report?.status === 'clôturé';
-  const isDisabled = isFinalized || isValidating || isRejecting || validating || rejecting;
-  
-  // ✅ Fixed header display: prioritize compliance_details.annexe1.nom_organisme
-  const organismName = (report?.compliance_details?.annexe1?.nom_organisme || report?.organism_name || '—').trim();
+  const isDisabled  = isFinalized || isValidating || isRejecting || validating || rejecting;
+
+  const extracted    = normalizeExtracted(report);
+  const a1           = extracted?.annexe1 || {};
+  const organismName = (a1.nom_organisme || report?.organism_name || '—').trim();
 
   return (
     <div className="tri-root">
       {toast && <div className={`tri-toast ${toast.err ? 'error' : ''}`}>{toast.msg}</div>}
 
-      {/* ── Col gauche: Toutes les annexes (données brutes) ── */}
+      {/* ── Col gauche ── */}
       <div className="tri-left-col">
         <div className="tri-card">
           <div className="tri-card-head">
             <h3>📂 Données brutes du rapport</h3>
-            <span style={{ fontSize: 11, color: '#64748b' }}>
-              {organismName}
-            </span>
+            <span style={{ fontSize: 11, color: '#64748b' }}>{organismName}</span>
           </div>
           <LeftAnnexesViewer report={report} />
-          
-          {onValidate && onReject && (
+
+          {onValidate && (
             <div className="tri-approve-bar">
               <button
                 className="tri-btn-approve"
-                onClick={() => {
-                  onValidate(report.id);
-                  showToast('📤 Rapport soumis au responsable pour validation finale.');
-                }}
-                disabled={report?.status === 'en_validation' || report?.status === 'validé'}
+                onClick={handleValidate}
+                disabled={report?.status === 'en_validation' || report?.status === 'validé' || isValidating}
               >
-                {report?.status === 'en_validation' ? '⏳ En attente responsable' : '✓ Soumettre au responsable'}
+                {report?.status === 'en_validation' ? '⏳ En attente responsable' : isValidating ? '⏳ Soumission…' : '✓ Soumettre au responsable'}
               </button>
-              <button 
-                className="tri-btn-reject-main"
-                onClick={handleReject}
-                disabled={isDisabled}
-                style={{ opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer' }}
-              >
-                {isRejecting || rejecting ? '⏳ Rejet...' : '✕ Rejeter'}
-              </button>
+              {onReject && (
+                <button
+                  className="tri-btn-reject-main"
+                  onClick={handleReject}
+                  disabled={isDisabled}
+                  style={{ opacity: isDisabled ? 0.5 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+                >
+                  {isRejecting || rejecting ? '⏳ Rejet...' : '✕ Rejeter'}
+                </button>
+              )}
             </div>
           )}
-          
+
           {isFinalized && (
-            <div style={{ 
-              padding: '10px 16px', 
+            <div style={{
+              padding: '10px 16px',
               background: report?.status === 'validé' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
               borderTop: '1px solid rgba(139,92,246,0.1)',
-              textAlign: 'center',
-              fontSize: 12,
-              fontWeight: 600,
-              color: report?.status === 'validé' ? '#34d399' : '#f87171'
+              textAlign: 'center', fontSize: 12, fontWeight: 600,
+              color: report?.status === 'validé' ? '#34d399' : '#f87171',
             }}>
               {report?.status === 'validé' ? '✓ Rapport approuvé' : '✗ Rapport rejeté'}
             </div>
@@ -809,36 +1579,31 @@ export default function TechnicalReviewInterface({
         </div>
       </div>
 
-      {/* ── Col droite: Synthèse extraite ── */}
+      {/* ── Col droite ── */}
       <div className="tri-right-col">
         <div className="tri-card" style={{ marginBottom: 20 }}>
           <div className="tri-card-head">
-            <h3>📊 Données extraites du rapport</h3>
-            <span style={{ fontSize: 11, color: '#64748b' }}>
-              {organismName}
-            </span>
+            <h3>📊 Données extraites — Revue technique</h3>
+            <span style={{ fontSize: 11, color: '#64748b' }}>{organismName}</span>
           </div>
-          <div className="tri-panel">
-            <SynthesisPanel 
-              report={report} 
-              annotatedPaths={annotatedPaths} 
-              onAnnotateField={handleAnnotateField} 
-            />
-          </div>
+          <SynthesisPanel
+            report={report}
+            annotatedPaths={annotatedPaths}
+            onAnnotateField={handleAnnotateField}
+          />
         </div>
 
-        {/* Annotations */}
         <div className="tri-card">
           <AnnotationsPanel
-            annotations={annotations} 
-            annLoading={annLoading} 
+            annotations={annotations}
+            annLoading={annLoading}
             counts={counts}
-            addAnnotation={addAnnotation} 
+            addAnnotation={addAnnotation}
             deleteAnnotation={deleteAnnotation}
-            sendToResponsable={sendToResponsable} 
+            sendToResponsable={sendToResponsable}
             selectedField={selectedField}
-            clearSelectedField={() => setSelectedField(null)} 
-            report={report} 
+            clearSelectedField={() => setSelectedField(null)}
+            report={report}
           />
         </div>
       </div>
