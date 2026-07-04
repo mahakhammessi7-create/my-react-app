@@ -1357,7 +1357,7 @@ const toggleCheckResp = (rId, cId) => {
   const TABS = [
     { key:'rapports',     label:'Rapports',           icon:'≡', badge:total, badgeNew: unassignedCount > 0 },
     { key:'validation',   label:'Validation QA',      icon:'✓', badge:enAttenteCount },
-    { key:'indicateurs',  label:'KPIs Sécurité',      icon:'∿', badge:kpis.length },
+   
   ];
 
   // ═══════════════════════════════════════════════════════════════
@@ -1431,7 +1431,7 @@ const toggleCheckResp = (rId, cId) => {
         {/* ── SECTION RENDER ── */}
         {section === 'rapports'     && <TabRapports />}
         {section === 'validation'   && <TabValidation />}
-        {section === 'indicateurs'  && <TabIndicateurs />}
+        
       </div>
     </div>
   );

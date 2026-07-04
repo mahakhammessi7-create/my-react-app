@@ -99,6 +99,17 @@ const norm = s =>
   (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
 // ══════════════════════════════════════════════
+// getAnnexeNumber — pulls "3" out of "Annexe 3 — ..."
+// so backend annexe titles (which may be worded slightly
+// differently than the client-side labels) can still be
+// matched to the right row by number.
+// ══════════════════════════════════════════════
+const getAnnexeNumber = (str) => {
+  const m = (str || '').match(/annexe\s*(\d+)/i);
+  return m ? m[1] : null;
+};
+
+// ══════════════════════════════════════════════
 // ALL 9 ANNEXES DEFINITION
 // ══════════════════════════════════════════════
 const ANNEXES = [
@@ -910,15 +921,39 @@ function validateContent(tables, text, indicators) {
       };
     })(),
 
-    // ── Annexe 3 — STRICT: require real extracted SI data ──
+    // ── Annexe 3 — STRICT: require real extracted SI data AND complete
+    //    mandatory per-server fields (mirrors the backend's own validation:
+    //    nom, @IP, type MV/MP, système d'exploitation, rôle/métier for
+    //    every server row — not just "at least one server found") ──
     (() => {
+      const REQUIRED_SERVER_FIELDS = [
+        { key: 'nom',  label: 'nom' },
+        { key: 'ip',   label: '@IP' },
+        { key: 'type', label: 'type (MV/MP)' },
+        { key: 'os',   label: 'système d\'exploitation' },
+        { key: 'role', label: 'rôle/métier' },
+      ];
+
+      const serverFieldWarnings = [];
+      servers.forEach((s, idx) => {
+        REQUIRED_SERVER_FIELDS.forEach(({ key, label }) => {
+          if (!s[key] || s[key].trim() === '') {
+            serverFieldWarnings.push(`Serveur[${idx + 1}].${label} manquant`);
+          }
+        });
+      });
+
       const total = servers.length + apps.length + network.length;
+      const hasIncompleteServers = serverFieldWarnings.length > 0;
+
       return {
         key: 'annexe3',
         label: "Annexe 3 — Description du Système d'Information",
-        found: total >= 1,
+        found: total >= 1 && !hasIncompleteServers,
         detail: `${servers.length} serveurs, ${apps.length} applis, ${network.length} équip. réseau`,
-        warnings: total === 0 ? ['Aucune donnée SI extraite des tableaux (vérifier format)'] : [],
+        warnings: total === 0
+          ? ['Aucune donnée SI extraite des tableaux (vérifier format)']
+          : serverFieldWarnings,
       };
     })(),
 
@@ -997,7 +1032,7 @@ function validateContent(tables, text, indicators) {
   const failed   = checks.filter(c => !c.found && !c.optional);
   const warnings = checks.flatMap(c => (c.warnings || []).map(w => `${c.label}: ${w}`));
   const score    = Math.round((checks.filter(c => c.found).length / checks.length) * 100);
-  
+
   // ── STRICT: require both no failures AND minimum score ──
   const isValid  = failed.length === 0 && score >= 60;
 
@@ -1114,6 +1149,9 @@ export default function AuditForm() {
   const [wordCount,    setWordCount]    = useState(0);
   const [apiError,     setApiError]     = useState('');
   const [expanded,     setExpanded]     = useState(null);
+  // Backend field-level rejection reasons, grouped by annexe number, e.g.
+  // { "3": ["Serveur[5].nom est vide ou absent", ...], "4": [...] }
+  const [backendAnnexeErrors, setBackendAnnexeErrors] = useState({});
 
   useEffect(() => {
     inject();
@@ -1133,11 +1171,13 @@ export default function AuditForm() {
     }
     setFile(f); setStatus('idle'); setProgress(0);
     setErrors([]); setWarnings([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null);
+    setBackendAnnexeErrors({});
   };
 
   const handleVerify = async () => {
     if (status === 'loading' || status === 'saving' || !file) return;
     setStatus('loading'); setProgress(0); setStepIdx(0); setApiError('');
+    setBackendAnnexeErrors({});
     try {
       setStepIdx(0); setProgress(8);
       const { text, html } = await readFileContent(file);
@@ -1177,7 +1217,12 @@ export default function AuditForm() {
       const extractedData = buildExtractedData(validation, user);
       localStorage.setItem('extractedData', JSON.stringify(extractedData));
 
-      // ─── API UPLOAD — failures are non-blocking ───
+      // ─── API UPLOAD ───
+      // NOTE: a 422 from the server means the report was REJECTED (missing
+      // mandatory fields), not "accepted with optional-field warnings".
+      // Previously this branch only called setApiError(...) and then fell
+      // through to the unconditional setStatus('ok') below, so the UI showed
+      // "RAPPORT CONFORME" even when the backend had rejected the file.
       const token = localStorage.getItem('token');
       if (token) {
         setStatus('saving');
@@ -1208,12 +1253,23 @@ export default function AuditForm() {
           const data       = apiErr.response?.data;
 
           if (statusCode === 422) {
-            const backendWarnings = (data?.annexeValidation || [])
-              .flatMap(a => (a.missingFields || []).map(f => `${a.title} → ${f.reason}`));
-            const warnMsg = backendWarnings.length > 0
-              ? `Rapport soumis avec ${backendWarnings.length} avertissement(s) serveur (champs facultatifs manquants).`
-              : data?.error || 'Rapport soumis avec des avertissements serveur.';
-            setApiError(`⚠️ ${warnMsg}`);
+            // Server-side REJECTION (mandatory fields missing) — this is a
+            // hard failure, not a soft warning. Group the reasons by annexe
+            // number so they render inline under the matching row instead
+            // of as a separate flat list, then stop here so we don't fall
+            // through to setStatus('ok').
+            const grouped = {};
+            (data?.annexeValidation || []).forEach(a => {
+              const num = getAnnexeNumber(a.title) || a.title;
+              const reasons = (a.missingFields || []).map(f => f.reason);
+              grouped[num] = (grouped[num] || []).concat(reasons);
+            });
+            setBackendAnnexeErrors(grouped);
+            setErrors(Object.keys(grouped).length > 0
+              ? []
+              : [data?.error || 'Rapport rejeté par le serveur (champs obligatoires manquants).']);
+            setStatus('fail');
+            return;
           } else {
             const msg = data?.error || apiErr.message;
             setApiError(`Rapport analysé localement · Sauvegarde échouée : ${msg}`);
@@ -1241,6 +1297,7 @@ export default function AuditForm() {
   const reset = () => {
     setFile(null); setStatus('idle'); setProgress(0);
     setErrors([]); setWarnings([]); setCheckResults([]); setScore(null); setApiError(''); setExpanded(null);
+    setBackendAnnexeErrors({});
   };
 
   const onDragOver  = (e) => { e.preventDefault(); setDrag(true); };
@@ -1248,6 +1305,29 @@ export default function AuditForm() {
   const onDrop      = (e) => { e.preventDefault(); setDrag(false); selectFile(e.dataTransfer.files[0]); };
 
   const initials = user ? (user.username || user.company_name || 'U').charAt(0).toUpperCase() : 'U';
+
+  // Merge client-side per-annexe results with backend field-level rejection
+  // reasons (grouped by annexe number) so a row like "Annexe 3" shows both
+  // its own check AND any server-reported missing fields together, instead
+  // of the server's reasons appearing as a separate flat list elsewhere.
+  const mergedResults = checkResults.map(r => {
+    const num = getAnnexeNumber(r.label);
+    const backendIssues = (num && backendAnnexeErrors[num]) ? backendAnnexeErrors[num] : [];
+    return {
+      ...r,
+      found: r.found && backendIssues.length === 0,
+      warnings: [...(r.warnings || []), ...backendIssues],
+    };
+  });
+
+  // Recompute the displayed score from the merged results (client checks +
+  // backend rejections) rather than the raw client-side `score`, so a report
+  // the server rejected never shows "100%" next to "NON CONFORME".
+  const effectiveScore = mergedResults.length
+    ? Math.round((mergedResults.filter(r => r.found).length / mergedResults.length) * 100)
+    : score;
+
+  const totalServerIssues = Object.values(backendAnnexeErrors).reduce((sum, arr) => sum + arr.length, 0);
 
   const NAV_LINKS = [
     { to: '/client/dashboard',     label: 'Déposer un rapport', icon: '📤' },
@@ -1362,21 +1442,26 @@ export default function AuditForm() {
 
             {/* SUCCESS */}
             {status === 'ok' && (
-              <div className="af-anim" style={{ marginTop: 18, padding: '16px 20px', background: 'rgba(74,222,128,.07)', border: '1px solid rgba(74,222,128,.2)', borderRadius: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(74,222,128,.15)', border: '1px solid rgba(74,222,128,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>✅</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: GREEN, fontSize: 15, marginBottom: 3 }}>RAPPORT CONFORME</div>
-                    <div style={{ fontSize: 12, color: apiError ? AMBER : '#3d607a' }}>
-                      {apiError ? apiError : `✅ Soumis à l'ANCS · ${wordCount} mots analysés`}
+              <div className="af-anim" style={{ marginTop: 18, padding: '18px 20px', background: 'rgba(74,222,128,.06)', border: '1px solid rgba(74,222,128,.18)', borderRadius: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(74,222,128,.14)', border: '2px solid rgba(74,222,128,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>✅</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: GREEN, fontSize: 16, letterSpacing: '.2px' }}>RAPPORT CONFORME</div>
+                    <div style={{ fontSize: 12, color: apiError ? AMBER : '#3d607a', marginTop: 3 }}>
+                      {apiError ? apiError : `Soumis à l'ANCS · ${wordCount} mots analysés`}
                     </div>
                   </div>
-                  <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, color: GREEN, fontSize: 28, flexShrink: 0 }}>{score}%</div>
+                  {effectiveScore !== null && (
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, color: GREEN, fontSize: 26, lineHeight: 1 }}>{effectiveScore}%</div>
+                      <div style={{ fontSize: 9, color: '#3d607a', textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 2 }}>Score global</div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Warnings (non-blocking) */}
                 {warnings.length > 0 && (
-                  <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 10 }}>
+                  <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.15)', borderRadius: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: AMBER, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>Avertissements non bloquants</div>
                     {warnings.map((w, i) => (
                       <div key={i} style={{ fontSize: 11, color: '#c8a040', padding: '2px 0', display: 'flex', gap: 6 }}>
@@ -1386,69 +1471,170 @@ export default function AuditForm() {
                   </div>
                 )}
 
-                {/* Per-annexe results */}
-                <div style={{ borderTop: '1px solid rgba(74,222,128,.15)', paddingTop: 12 }}>
-                  {checkResults.map((r, i) => (
-                    <div key={i}>
-                      <div className="af-check-row" style={{ cursor: r.warnings?.length ? 'pointer' : 'default' }}
-                        onClick={() => r.warnings?.length && setExpanded(expanded === i ? null : i)}>
-                        <span style={{ fontSize: 14, flexShrink: 0 }}>{r.found ? (r.warnings?.length ? '⚠️' : '✅') : '❌'}</span>
-                        <span style={{ color: r.found ? '#8ab0c8' : RED, flex: 1, fontWeight: 600 }}>{r.label}</span>
-                        <span style={{ fontSize: 11, color: '#2a4a62' }}>{r.detail}</span>
-                        {r.optional && <span style={{ fontSize: 10, color: '#2a4a62' }}>(opt.)</span>}
-                        {r.warnings?.length > 0 && <span style={{ fontSize: 10, color: AMBER }}>{expanded === i ? '▲' : '▼'}</span>}
-                      </div>
-                      {expanded === i && r.warnings?.map((w, j) => (
-                        <div key={j} className="af-sub-check">
-                          <span style={{ fontSize: 12 }}>⚠️</span>
-                          <span style={{ color: AMBER }}>{w}</span>
+                {/* Per-annexe cards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {mergedResults.map((r, i) => {
+                    const isOpen = expanded === i;
+                    return (
+                      <div key={i} style={{
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        border: `1px solid ${r.found ? 'rgba(255,255,255,.06)' : 'rgba(248,113,113,.22)'}`,
+                        background: r.found ? 'rgba(255,255,255,.02)' : 'rgba(248,113,113,.04)',
+                        transition: 'border-color .2s,background .2s',
+                      }}>
+                        <div
+                          onClick={() => r.warnings?.length && setExpanded(expanded === i ? null : i)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', cursor: r.warnings?.length ? 'pointer' : 'default' }}
+                        >
+                          <div style={{
+                            width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
+                            background: r.found ? 'rgba(74,222,128,.14)' : 'rgba(248,113,113,.14)',
+                            border: `1px solid ${r.found ? 'rgba(74,222,128,.3)' : 'rgba(248,113,113,.3)'}`,
+                            color: r.found ? GREEN : RED,
+                          }}>
+                            {r.found ? '✓' : '✕'}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, color: r.found ? '#c8dff4' : '#f3a3a3' }}>
+                              {r.label}{r.optional && <span style={{ fontSize: 10, color: '#2a4a62', fontWeight: 500 }}> (optionnelle)</span>}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#3d607a', marginTop: 1 }}>{r.detail}</div>
+                          </div>
+                          {r.warnings?.length > 0 && (
+                            <span style={{ fontSize: 10, color: '#3d607a', flexShrink: 0 }}>{isOpen ? '▲' : '▼'}</span>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  ))}
+
+                        {isOpen && r.warnings?.length > 0 && (
+                          <div style={{ padding: '0 14px 12px 14px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            {r.warnings.map((w, j) => (
+                              <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 10px', borderRadius: 8, background: 'rgba(251,191,36,.05)', borderLeft: `2px solid ${AMBER}` }}>
+                                <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1 }}>⚠️</span>
+                                <span style={{ fontSize: 11.5, lineHeight: 1.5, color: '#c8a040' }}>{w}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
             {/* FAIL */}
             {status === 'fail' && (
-              <div className="af-anim" style={{ marginTop: 18, padding: '16px 20px', background: 'rgba(248,113,113,.07)', border: '1px solid rgba(248,113,113,.2)', borderRadius: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                  <span style={{ fontSize: 20 }}>❌</span>
-                  <div>
-                    <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: RED, fontSize: 15 }}>RAPPORT NON CONFORME</div>
-                    {score !== null && <div style={{ fontSize: 12, color: '#3d607a', marginTop: 2 }}>Score : {score}% · {wordCount} mots</div>}
+              <div className="af-anim" style={{ marginTop: 18, padding: '18px 20px', background: 'rgba(248,113,113,.06)', border: '1px solid rgba(248,113,113,.18)', borderRadius: 16 }}>
+
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(248,113,113,.12)', border: '2px solid rgba(248,113,113,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>❌</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: RED, fontSize: 16, letterSpacing: '.2px' }}>RAPPORT NON CONFORME</div>
+                    <div style={{ fontSize: 12, color: '#3d607a', marginTop: 3 }}>
+                      {wordCount} mots analysés
+                      {totalServerIssues > 0 && (
+                        <span style={{ color: '#e08a8a' }}> · {totalServerIssues} champ(s) rejeté(s) par le serveur</span>
+                      )}
+                    </div>
                   </div>
+                  {effectiveScore !== null && (
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, color: RED, fontSize: 26, lineHeight: 1 }}>{effectiveScore}%</div>
+                      <div style={{ fontSize: 9, color: '#3d607a', textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 2 }}>Score global</div>
+                    </div>
+                  )}
                 </div>
 
-                {checkResults.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    {checkResults.map((r, i) => (
-                      <div key={i}>
-                        <div className="af-check-row" style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === i ? null : i)}>
-                          <span style={{ fontSize: 14, flexShrink: 0 }}>{r.found ? '✅' : '❌'}</span>
-                          <span style={{ color: r.found ? '#4a6a88' : RED, flex: 1, fontWeight: 600 }}>{r.label}</span>
-                          <span style={{ fontSize: 11, color: '#3d607a' }}>{r.detail}</span>
-                          {r.warnings?.length > 0 && <span style={{ fontSize: 10, color: AMBER }}>{expanded === i ? '▲' : '▼'}</span>}
-                        </div>
-                        {expanded === i && r.warnings?.map((w, j) => (
-                          <div key={j} className="af-sub-check">
-                            <span style={{ fontSize: 12 }}>⚠️</span>
-                            <span style={{ color: AMBER }}>{w}</span>
+                {/* Legend */}
+                {totalServerIssues > 0 && (
+                  <div style={{ display: 'flex', gap: 16, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#e08a8a' }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: RED, flexShrink: 0 }} />Rejeté par le serveur
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: '#c8a040' }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: AMBER, flexShrink: 0 }} />Avertissement local
+                    </div>
+                  </div>
+                )}
+
+                {/* Per-annexe cards */}
+                {mergedResults.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                    {mergedResults.map((r, i) => {
+                      const num = getAnnexeNumber(r.label);
+                      const backendCount = num && backendAnnexeErrors[num] ? backendAnnexeErrors[num].length : 0;
+                      const hasBackendIssues = backendCount > 0;
+                      const isOpen = expanded === i || hasBackendIssues;
+                      return (
+                        <div key={i} style={{
+                          borderRadius: 12,
+                          overflow: 'hidden',
+                          border: `1px solid ${r.found ? 'rgba(255,255,255,.06)' : 'rgba(248,113,113,.22)'}`,
+                          background: r.found ? 'rgba(255,255,255,.02)' : 'rgba(248,113,113,.04)',
+                          transition: 'border-color .2s,background .2s',
+                        }}>
+                          <div
+                            onClick={() => r.warnings?.length && setExpanded(expanded === i ? null : i)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', cursor: r.warnings?.length ? 'pointer' : 'default' }}
+                          >
+                            <div style={{
+                              width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
+                              background: r.found ? 'rgba(74,222,128,.14)' : 'rgba(248,113,113,.14)',
+                              border: `1px solid ${r.found ? 'rgba(74,222,128,.3)' : 'rgba(248,113,113,.3)'}`,
+                              color: r.found ? GREEN : RED,
+                            }}>
+                              {r.found ? '✓' : '✕'}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: 700, color: r.found ? '#c8dff4' : '#f3a3a3' }}>{r.label}</div>
+                              <div style={{ fontSize: 11, color: '#3d607a', marginTop: 1 }}>{r.detail}</div>
+                            </div>
+                            {hasBackendIssues && (
+                              <span style={{ fontSize: 10, fontWeight: 700, color: RED, background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.25)', borderRadius: 99, padding: '3px 9px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                {backendCount} rejet{backendCount > 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {r.warnings?.length > 0 && (
+                              <span style={{ fontSize: 10, color: '#3d607a', flexShrink: 0 }}>{isOpen ? '▲' : '▼'}</span>
+                            )}
                           </div>
-                        ))}
+
+                          {isOpen && r.warnings?.length > 0 && (
+                            <div style={{ padding: '0 14px 12px 14px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              {r.warnings.map((w, j) => {
+                                const isBackendIssue = num && (backendAnnexeErrors[num] || []).includes(w);
+                                return (
+                                  <div key={j} style={{
+                                    display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 10px', borderRadius: 8,
+                                    background: isBackendIssue ? 'rgba(248,113,113,.06)' : 'rgba(251,191,36,.05)',
+                                    borderLeft: `2px solid ${isBackendIssue ? RED : AMBER}`,
+                                  }}>
+                                    <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1 }}>{isBackendIssue ? '●' : '⚠️'}</span>
+                                    <span style={{ fontSize: 11.5, lineHeight: 1.5, color: isBackendIssue ? '#f3a3a3' : '#c8a040', fontFamily: isBackendIssue ? "monospace" : 'inherit' }}>{w}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {errors.length > 0 && (
+                  <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {errors.map((e, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(248,113,113,.06)', borderLeft: `2px solid ${RED}`, fontSize: 12, color: '#f3a3a3', lineHeight: 1.5 }}>
+                        <span style={{ flexShrink: 0 }}>●</span><span>{e}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {errors.map((e, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 12, color: RED, lineHeight: 1.5 }}>
-                    <span style={{ flexShrink: 0 }}>●</span><span>{e}</span>
-                  </div>
-                ))}
-
-                <div style={{ fontSize: 11, color: '#3d607a', marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: '#3d607a', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.05)' }}>
                   Complétez les sections manquantes en utilisant le modèle officiel ANCS v2.1 (Annexes 1 à 9).
                 </div>
               </div>
